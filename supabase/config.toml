@@ -1,0 +1,10 @@
+project_id = "zizcfzhlbpuirupxtqcm"
+
+[functions.chat-bot]
+verify_jwt = true
+
+[functions.execute-tool]
+verify_jwt = true
+
+[functions.generate-appointment-excel]
+verify_jwt = true

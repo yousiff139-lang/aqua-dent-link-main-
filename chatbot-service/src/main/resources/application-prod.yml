@@ -1,0 +1,39 @@
+spring:
+  profiles:
+    active: prod
+  
+  # Production JPA settings
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+# Production logging
+logging:
+  level:
+    com.dentalcare.chatbot: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+
+# Production server settings
+server:
+  port: 8080
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+  compression:
+    enabled: true
+  http2:
+    enabled: true
+
+# Connection pooling
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000

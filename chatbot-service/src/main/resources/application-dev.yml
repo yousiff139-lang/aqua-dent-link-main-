@@ -1,0 +1,17 @@
+spring:
+  profiles:
+    active: dev
+
+# Development-specific settings
+logging:
+  level:
+    com.dentalcare.chatbot: DEBUG
+    org.springframework: DEBUG
+    org.hibernate: DEBUG
+
+# Enable detailed error messages
+server:
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: always

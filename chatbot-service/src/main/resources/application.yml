@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: dentalcare-chatbot
+  profiles:
+    active: ${SPRING_PROFILE:dev}
+  
+  # Redis configuration (optional)
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+  
+  # JPA configuration (for database-backed state store)
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+# Supabase configuration
+supabase:
+  url: ${SUPABASE_URL:}
+  service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+
+# Chatbot configuration
+chatbot:
+  session-timeout-minutes: 30
+  symptom-mapping-config: classpath:symptom-mapping.yml
+  max-retry-attempts: 3
+  retry-backoff-ms: 1000
+
+# Logging
+logging:
+  level:
+    com.dentalcare.chatbot: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG

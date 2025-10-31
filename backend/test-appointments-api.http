@@ -1,0 +1,51 @@
+### Test Appointments API Endpoints
+### This file can be used with REST Client extension in VS Code
+
+@baseUrl = http://localhost:3000/api
+@authToken = YOUR_AUTH_TOKEN_HERE
+
+### 1. Create a new appointment (POST /api/appointments)
+POST {{baseUrl}}/appointments
+Content-Type: application/json
+
+{
+  "patient_name": "John Doe",
+  "patient_email": "john.doe@example.com",
+  "patient_phone": "+1234567890",
+  "dentist_email": "dentist@example.com",
+  "reason": "Regular checkup",
+  "appointment_date": "2025-11-01",
+  "appointment_time": "10:00",
+  "payment_method": "cash",
+  "notes": "First time patient"
+}
+
+### 2. Get appointments for a dentist (GET /api/appointments/dentist/:dentistEmail)
+GET {{baseUrl}}/appointments/dentist/dentist@example.com
+Authorization: Bearer {{authToken}}
+
+### 3. Get appointments for a dentist with filters
+GET {{baseUrl}}/appointments/dentist/dentist@example.com?status=pending&limit=10
+Authorization: Bearer {{authToken}}
+
+### 4. Get appointments for a patient (GET /api/appointments/patient/:email)
+GET {{baseUrl}}/appointments/patient/john.doe@example.com
+Authorization: Bearer {{authToken}}
+
+### 5. Get appointment by ID (GET /api/appointments/:id)
+GET {{baseUrl}}/appointments/APPOINTMENT_ID_HERE
+Authorization: Bearer {{authToken}}
+
+### 6. Update appointment (PUT /api/appointments/:id)
+PUT {{baseUrl}}/appointments/APPOINTMENT_ID_HERE
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "status": "confirmed",
+  "notes": "Confirmed by dentist"
+}
+
+### 7. Cancel appointment (DELETE /api/appointments/:id)
+DELETE {{baseUrl}}/appointments/APPOINTMENT_ID_HERE
+Authorization: Bearer {{authToken}}

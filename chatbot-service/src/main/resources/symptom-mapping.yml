@@ -1,0 +1,64 @@
+# Symptom to Specialization Mapping Configuration
+# This file allows updating symptom mappings without code changes
+
+specializations:
+  endodontist:
+    keywords:
+      - pain
+      - ache
+      - toothache
+      - sensitivity
+      - nerve
+      - root canal
+      - abscess
+  
+  orthodontist:
+    keywords:
+      - braces
+      - alignment
+      - crooked
+      - straighten
+      - misaligned
+      - overbite
+      - underbite
+      - retainer
+  
+  periodontist:
+    keywords:
+      - gum
+      - bleeding
+      - swollen
+      - periodontal
+      - gums
+      - gingivitis
+      - periodontitis
+  
+  prosthodontist:
+    keywords:
+      - crown
+      - filling
+      - bridge
+      - denture
+      - implant
+      - restoration
+      - cap
+  
+  cosmetic_dentist:
+    keywords:
+      - whitening
+      - cosmetic
+      - veneer
+      - smile
+      - aesthetic
+      - bleaching
+      - bonding
+  
+  general_dentist:
+    keywords:
+      - cleaning
+      - checkup
+      - routine
+      - exam
+      - cavity
+      - hygiene
+      - polish

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>Admin Dashboard Diagnostic</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        function addResult(message, isSuccess) {
+            const div = document.createElement('div');
+            div.className = `status ${isSuccess ? 'success' : 'error'}`;
+            div.textContent = message;
+            results.appendChild(div);
+        }
+
+        // Test 1: Basic module loading
+        try {
+            addResult('✓ JavaScript is running', true);
+        } catch (e) {
+            addResult('✗ JavaScript error: ' + e.message, false);
+        }
+
+        // Test 2: Check if React can load
+        try {
+            const react = await import('react');
+            addResult('✓ React loaded successfully', true);
+        } catch (e) {
+            addResult('✗ React failed to load: ' + e.message, false);
+        }
+
+        // Test 3: Check if ReactDOM can load
+        try {
+            const reactDOM = await import('react-dom/client');
+            addResult('✓ ReactDOM loaded successfully', true);
+        } catch (e) {
+            addResult('✗ ReactDOM failed to load: ' + e.message, false);
+        }
+
+        // Test 4: Check path aliases
+        try {
+            const utils = await import('./lib/utils.ts');
+            addResult('✓ Path aliases working (lib/utils)', true);
+        } catch (e) {
+            addResult('✗ Path aliases failed: ' + e.message, false);
+        }
+
+        // Test 5: Check AuthContext
+        try {
+            const auth = await import('./contexts/AuthContext.tsx');
+            addResult('✓ AuthContext loaded', true);
+        } catch (e) {
+            addResult('✗ AuthContext failed: ' + e.message, false);
+        }
+
+        // Test 6: Check ThemeContext
+        try {
+            const theme = await import('./contexts/ThemeContext.tsx');
+            addResult('✓ ThemeContext loaded', true);
+        } catch (e) {
+            addResult('✗ ThemeContext failed: ' + e.message, false);
+        }
+
+        // Test 7: Check App component
+        try {
+            const app = await import('./App.tsx');
+            addResult('✓ App component loaded', true);
+        } catch (e) {
+            addResult('✗ App component failed: ' + e.message, false);
+        }
+
+        // Test 8: Try to render
+        try {
+            const React = await import('react');
+            const ReactDOM = await import('react-dom/client');
+            const { default: App } = await import('./App.tsx');
+            
+            const testDiv = document.createElement('div');
+            testDiv.id = 'test-root';
+            document.body.appendChild(testDiv);
+            
+            const root = ReactDOM.createRoot(testDiv);
+            root.render(React.createElement(App));
+            
+            addResult('✓ React rendering succeeded', true);
+        } catch (e) {
+            addResult('✗ React rendering failed: ' + e.message, false);
+            console.error('Render error:', e);
+        }
+    </script>
+</body>
+</html>
