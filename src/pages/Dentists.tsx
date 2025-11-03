@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Star, Calendar, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { ChatbotWidget } from "@/components/ChatbotWidget";
 import { Link } from "react-router-dom";
 import { useDentists } from "@/hooks/useDentists";
 
@@ -127,6 +128,7 @@ const Dentists = () => {
       </section>
       
       <Footer />
+      <ChatbotWidget />
     </div>
   );
 };

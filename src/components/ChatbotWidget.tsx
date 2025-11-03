@@ -62,13 +62,27 @@ export const ChatbotWidget = () => {
   const handleOpen = async () => {
     setIsOpen(true);
     
-    if (messages.length === 0 && user) {
+    // Start conversation for both authenticated and guest users
+    if (messages.length === 0) {
       setIsLoading(true);
       try {
-        const response = await chatbotService.startConversation(user.id);
+        // Get or create guest session ID
+        let guestSessionId = localStorage.getItem('guest_session_id');
+        if (!user && !guestSessionId) {
+          guestSessionId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          localStorage.setItem('guest_session_id', guestSessionId);
+        }
+        
+        // Pass userId if user is logged in, otherwise undefined for guest session
+        const response = await chatbotService.startConversation(user?.id);
         addBotMessage(response);
       } catch (error) {
         console.error('Error starting conversation:', error);
+        addBotMessage({
+          message: "I'm sorry, I couldn't start the conversation. Please try again.",
+          state: 'error' as any,
+          requiresInput: true,
+        });
       } finally {
         setIsLoading(false);
       }
@@ -89,7 +103,15 @@ export const ChatbotWidget = () => {
   const handleSend = async (text?: string) => {
     const messageText = text || input.trim();
     
-    if (!messageText || !user) return;
+    if (!messageText) return;
+    
+    // Generate or get session ID for guest users
+    const sessionId = user?.id || `guest_${localStorage.getItem('guest_session_id') || Date.now()}`;
+    
+    // Store guest session ID in localStorage if not authenticated
+    if (!user && !localStorage.getItem('guest_session_id')) {
+      localStorage.setItem('guest_session_id', sessionId);
+    }
 
     // Add user message
     const userMessage: Message = {
@@ -104,15 +126,37 @@ export const ChatbotWidget = () => {
     // Get bot response
     setIsLoading(true);
     try {
-      const response = await chatbotService.handleUserInput(user.id, messageText);
+      // Use session ID (user ID if authenticated, guest ID if not)
+      const response = await chatbotService.handleUserInput(sessionId, messageText);
       addBotMessage(response);
-    } catch (error) {
+      
+      // If the response indicates authentication is needed for booking
+      if (response.state === 'error' && response.message?.includes('sign in')) {
+        addBotMessage({
+          message: "💡 Tip: You can sign in now and continue your booking. I'll remember what you told me!",
+          state: 'error' as any,
+          requiresInput: true,
+        });
+      }
+    } catch (error: any) {
       console.error('Error handling input:', error);
-      addBotMessage({
-        message: "I'm sorry, something went wrong. Please try again.",
-        state: 'error' as any,
-        requiresInput: true,
-      });
+      const errorMessage = error.message || "I'm sorry, something went wrong. Please try again.";
+      
+      // If it's an authentication error, provide helpful message
+      if (errorMessage.includes('sign in') || errorMessage.includes('authenticated')) {
+        addBotMessage({
+          message: `${errorMessage}\n\nWould you like to sign in now to continue?`,
+          state: 'error' as any,
+          options: ['Yes, sign in', 'No, continue as guest'],
+          requiresInput: true,
+        });
+      } else {
+        addBotMessage({
+          message: errorMessage,
+          state: 'error' as any,
+          requiresInput: true,
+        });
+      }
     } finally {
       setIsLoading(false);
     }

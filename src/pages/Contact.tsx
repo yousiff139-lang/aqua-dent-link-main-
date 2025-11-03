@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { MapPin, Phone, Mail, Clock, User, MessageSquare } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { ChatbotWidget } from "@/components/ChatbotWidget";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
@@ -222,6 +223,7 @@ const Contact = () => {
       </section>
       
       <Footer />
+      <ChatbotWidget />
     </div>
   );
 };

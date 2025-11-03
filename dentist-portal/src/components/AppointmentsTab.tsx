@@ -149,6 +149,16 @@ const AppointmentsTab = () => {
     setRescheduleDialogOpen(true);
   };
 
+  // Handle notes update
+  const handleUpdateNotes = async (appointmentId: string, notes: string) => {
+    try {
+      await appointmentService.saveNotes(appointmentId, notes);
+      await refetch(); // Refresh appointments to show updated notes
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to save notes');
+    }
+  };
+
   const confirmReschedule = async (date: string, time: string) => {
     if (!selectedAppointment) return;
 
@@ -317,6 +327,7 @@ const AppointmentsTab = () => {
                   appointment={appointment}
                   onMarkComplete={handleMarkComplete}
                   onReschedule={handleReschedule}
+                  onUpdateNotes={handleUpdateNotes}
                   isProcessing={isProcessing}
                 />
               ))}

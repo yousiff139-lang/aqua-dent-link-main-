@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Appointment, AppointmentFilters, AppointmentStatus } from '@/types';
-import api from '@/services/api';
 import { supabase } from '@/lib/supabase';
+import { dentistService } from '@/services/dentist.service';
 import { toast } from 'sonner';
 
 interface UseAppointmentsResult {
@@ -29,39 +29,14 @@ export const useAppointments = (
       setIsLoading(true);
       setError(null);
 
-      // Build query params
-      const params: Record<string, any> = {};
-      if (filters?.status) {
-        if (Array.isArray(filters.status)) {
-          params.status = filters.status.join(',');
-        } else {
-          params.status = filters.status;
-        }
-      }
-      if (filters?.date_from) params.date_from = filters.date_from;
-      if (filters?.date_to) params.date_to = filters.date_to;
-      if (filters?.limit) params.limit = filters.limit;
-      if (filters?.offset) params.offset = filters.offset;
-
-      const response = await api.get(`/appointments/dentist/${dentistEmail}`, {
-        params,
-      });
-
-      const data = response.data?.data || response.data || [];
+      // Use dentistService to fetch appointments from Supabase
+      const data = await dentistService.getPatients(dentistEmail, filters);
       setAppointments(data);
     } catch (err: any) {
       let errorMessage = 'Failed to load appointments. Please try again.';
       
       if (err.message) {
         errorMessage = err.message;
-      } else if (err.status === 401) {
-        errorMessage = 'Your session has expired. Please log in again.';
-      } else if (err.status === 403) {
-        errorMessage = 'You do not have permission to view these appointments.';
-      } else if (err.status === 404) {
-        errorMessage = 'No appointments found.';
-      } else if (err.status && err.status >= 500) {
-        errorMessage = 'Server error. Please try again later.';
       }
       
       setError(errorMessage);

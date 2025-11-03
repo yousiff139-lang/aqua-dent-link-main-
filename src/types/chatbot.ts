@@ -14,6 +14,8 @@ export enum ConversationState {
   SUGGESTING_DENTIST = 'suggesting_dentist',
   AWAITING_DENTIST_CONFIRMATION = 'awaiting_dentist_confirmation',
   AWAITING_DATE_TIME = 'awaiting_date_time',
+  AWAITING_PAYMENT_METHOD = 'awaiting_payment_method',
+  AWAITING_QUESTION = 'awaiting_question',
   AWAITING_FINAL_CONFIRMATION = 'awaiting_final_confirmation',
   COMPLETED = 'completed',
   ERROR = 'error',
@@ -24,6 +26,7 @@ export enum UserIntent {
   BOOK_APPOINTMENT = 'book_appointment',
   ASK_QUESTION = 'ask_question',
   CHECK_APPOINTMENT = 'check_appointment',
+  VIEW_DENTISTS = 'view_dentists',
   CANCEL_APPOINTMENT = 'cancel_appointment',
   UNKNOWN = 'unknown',
 }
@@ -58,8 +61,10 @@ export interface ConversationContext {
   suggestedDentist?: Dentist;
   selectedDate?: string;
   selectedTime?: string;
+  paymentMethod?: 'cash' | 'card';
   appointmentId?: string;
   intent?: UserIntent;
+  isGuest?: boolean; // Mark guest sessions
 }
 
 // Dentist information
@@ -106,11 +111,12 @@ export const SYMPTOM_SPECIALIZATION_MAP: Record<string, DentalSpecialization> = 
   'overbite': DentalSpecialization.ORTHODONTIST,
   'underbite': DentalSpecialization.ORTHODONTIST,
   
-  // Root canal / tooth pain
-  'tooth pain': DentalSpecialization.ENDODONTIST,
+  // Root canal / severe tooth pain (simple pain goes to General)
   'root canal': DentalSpecialization.ENDODONTIST,
   'severe toothache': DentalSpecialization.ENDODONTIST,
   'tooth infection': DentalSpecialization.ENDODONTIST,
+  'toothache': DentalSpecialization.ENDODONTIST,
+  // Simple tooth pain should go to General Dentist - map only severe cases to Endodontist
   
   // Extraction / surgery
   'wisdom teeth': DentalSpecialization.ORAL_SURGEON,
@@ -140,6 +146,9 @@ export const INTENT_KEYWORDS: Record<UserIntent, string[]> = {
   ],
   [UserIntent.CHECK_APPOINTMENT]: [
     'check', 'view', 'my appointment', 'when is', 'appointment status'
+  ],
+  [UserIntent.VIEW_DENTISTS]: [
+    'view dentists', 'show dentists', 'available dentists', 'list dentists', 'dentist list'
   ],
   [UserIntent.CANCEL_APPOINTMENT]: [
     'cancel', 'delete', 'remove appointment', 'don\'t want'

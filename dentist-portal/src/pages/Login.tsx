@@ -28,7 +28,7 @@ const Login = () => {
 
     try {
       await login(email);
-      navigate('/profile');
+      navigate('/appointments');
     } catch (err: any) {
       setError(err.message || 'Login failed. Please try again.');
     } finally {

@@ -5,10 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, User, CreditCard, CheckCircle, CalendarClock, Mail, Phone, FileText, Download } from 'lucide-react';
 import { format, parseISO, isFuture } from 'date-fns';
 
+import { PrivateNotes } from './PrivateNotes';
+
 interface AppointmentCardProps {
   appointment: Appointment;
   onMarkComplete: (appointment: Appointment) => void;
   onReschedule: (appointment: Appointment) => void;
+  onUpdateNotes?: (appointmentId: string, notes: string) => Promise<void>;
   isProcessing?: boolean;
 }
 
@@ -16,6 +19,7 @@ export const AppointmentCard = ({
   appointment,
   onMarkComplete,
   onReschedule,
+  onUpdateNotes,
   isProcessing = false,
 }: AppointmentCardProps) => {
   // Get status badge variant
@@ -191,13 +195,14 @@ export const AppointmentCard = ({
             )}
           </div>
 
-          {/* Notes (if any) */}
-          {appointment.notes && (
-            <div className="text-sm text-muted-foreground border-l-2 border-primary/30 pl-3">
-              <span className="font-medium">Notes: </span>
-              {appointment.notes}
-            </div>
-          )}
+          {/* Notes Section */}
+          <div className="border-t pt-4 mt-4">
+            <PrivateNotes
+              appointmentId={appointment.id}
+              initialNotes={appointment.notes || ''}
+              onSave={onUpdateNotes || (async () => {})}
+            />
+          </div>
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 pt-2 border-t">

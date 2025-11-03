@@ -8,29 +8,29 @@ export const useDentist = (email: string | undefined) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchDentist = async () => {
     if (!email) {
       setIsLoading(false);
       return;
     }
 
-    const fetchDentist = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const data = await dentistService.getByEmail(email);
-        setDentist(data);
-      } catch (err: any) {
-        const errorMessage = err.message || 'Failed to load dentist profile';
-        setError(errorMessage);
-        toast.error(errorMessage);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await dentistService.getByEmail(email);
+      setDentist(data);
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to load dentist profile';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchDentist();
   }, [email]);
 
-  return { dentist, isLoading, error };
+  return { dentist, isLoading, error, refetch: fetchDentist };
 };

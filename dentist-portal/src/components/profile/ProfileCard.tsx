@@ -1,13 +1,19 @@
+import { useState } from 'react';
 import { Dentist } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Mail, Briefcase, GraduationCap, Award } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Mail, Briefcase, GraduationCap, Award, Edit2 } from 'lucide-react';
+import ProfileEditForm from './ProfileEditForm';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ProfileCardProps {
   dentist: Dentist;
+  onUpdate?: (updatedDentist: Dentist) => void;
 }
 
-const ProfileCard = ({ dentist }: ProfileCardProps) => {
+const ProfileCard = ({ dentist, onUpdate }: ProfileCardProps) => {
+  const [isEditing, setIsEditing] = useState(false);
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -17,10 +23,40 @@ const ProfileCard = ({ dentist }: ProfileCardProps) => {
       .slice(0, 2);
   };
 
+  const handleSave = async (updatedDentist: Dentist) => {
+    // Update auth context with new dentist data
+    const session = JSON.parse(localStorage.getItem('dentist_auth') || '{}');
+    if (session) {
+      session.dentist = updatedDentist;
+      localStorage.setItem('dentist_auth', JSON.stringify(session));
+    }
+    
+    if (onUpdate) {
+      onUpdate(updatedDentist);
+    }
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <ProfileEditForm
+        dentist={dentist}
+        onSave={handleSave}
+        onCancel={() => setIsEditing(false)}
+      />
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profile Information</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Profile Information</CardTitle>
+          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+            <Edit2 className="h-4 w-4 mr-2" />
+            Edit Profile
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Avatar and Name */}

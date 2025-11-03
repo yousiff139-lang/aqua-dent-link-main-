@@ -114,3 +114,85 @@ export function useRealtimeAppointments(
   return { isSubscribed, error };
 }
 
+/**
+ * Hook to subscribe to any table changes with generic callbacks
+ */
+export function useRealtimeSync(options: {
+  table: string;
+  onInsert?: (record: any) => void;
+  onUpdate?: (record: any) => void;
+  onDelete?: (recordId: string) => void;
+}) {
+  const { table, onInsert, onUpdate, onDelete } = options;
+  const callbacksRef = useRef({ onInsert, onUpdate, onDelete });
+
+  useEffect(() => {
+    callbacksRef.current = { onInsert, onUpdate, onDelete };
+  }, [onInsert, onUpdate, onDelete]);
+
+  useEffect(() => {
+    let channel: RealtimeChannel;
+
+    try {
+      const channelKey = `realtime:${table}:${Date.now()}`;
+
+      channel = supabase
+        .channel(channelKey)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table,
+          },
+          (payload) => {
+            console.log(`Real-time: New ${table} created`, payload.new?.id);
+            callbacksRef.current.onInsert?.(payload.new);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table,
+          },
+          (payload) => {
+            console.log(`Real-time: ${table} updated`, payload.new?.id);
+            callbacksRef.current.onUpdate?.(payload.new);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table,
+          },
+          (payload) => {
+            console.log(`Real-time: ${table} deleted`, payload.old?.id);
+            if (callbacksRef.current.onDelete && payload.old?.id) {
+              callbacksRef.current.onDelete(payload.old.id);
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log(`Successfully subscribed to ${table} updates`);
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error(`Error subscribing to ${table} updates`, status);
+          }
+        });
+
+      return () => {
+        if (channel) {
+          console.log(`Unsubscribing from ${table} updates`);
+          supabase.removeChannel(channel);
+        }
+      };
+    } catch (err) {
+      console.error(`Error setting up ${table} subscription`, err);
+    }
+  }, [table]);
+}
+

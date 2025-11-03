@@ -7,7 +7,14 @@ import { AlertCircle } from 'lucide-react';
 
 const Profile = () => {
   const { dentist: authDentist } = useAuth();
-  const { dentist, isLoading, error } = useDentist(authDentist?.email);
+  const { dentist, isLoading, error, refetch } = useDentist(authDentist?.email);
+
+  const handleUpdate = async (updatedDentist: Dentist) => {
+    // Refresh the dentist data
+    if (refetch) {
+      await refetch();
+    }
+  };
 
   if (isLoading) {
     return (
@@ -49,7 +56,7 @@ const Profile = () => {
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6">Profile</h1>
-      <ProfileCard dentist={dentist} />
+      <ProfileCard dentist={dentist} onUpdate={handleUpdate} />
     </div>
   );
 };

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Save, Edit2, X, Clock } from 'lucide-react';
 import { format } from 'date-fns';
@@ -11,7 +10,7 @@ interface PrivateNotesProps {
   appointmentId: string;
   initialNotes?: string;
   updatedAt?: string;
-  onSave: (notes: string) => Promise<void>;
+  onSave: (appointmentId: string, notes: string) => Promise<void>;
 }
 
 export const PrivateNotes = ({
@@ -46,7 +45,7 @@ export const PrivateNotes = ({
     const loadingToast = toast.loading('Saving notes...');
 
     try {
-      await onSave(notes);
+      await onSave(appointmentId, notes);
       toast.success('Notes saved successfully', { id: loadingToast });
       setIsEditing(false);
       setHasChanges(false);
@@ -68,31 +67,29 @@ export const PrivateNotes = ({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-lg">Private Notes</CardTitle>
-            <CardDescription>
-              Add private notes about this appointment (visible only to you)
-            </CardDescription>
-          </div>
-          {!isEditing && (
-            <Button variant="outline" size="sm" onClick={handleEdit}>
-              <Edit2 className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-          )}
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <h4 className="text-sm font-semibold">Private Notes</h4>
+          <p className="text-xs text-muted-foreground">
+            Add notes about this appointment (visible only to you)
+          </p>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        {!isEditing && (
+          <Button variant="outline" size="sm" onClick={handleEdit}>
+            <Edit2 className="h-4 w-4 mr-2" />
+            {notes ? 'Edit' : 'Add Notes'}
+          </Button>
+        )}
+      </div>
+      <div className="space-y-2">
         {isEditing ? (
           <>
             <Textarea
               value={notes}
               onChange={(e) => handleNotesChange(e.target.value)}
               placeholder="Enter your private notes here..."
-              className="min-h-[150px] resize-y"
+              className="min-h-[100px] resize-y"
               disabled={isSaving}
             />
             <div className="flex items-center justify-between">
@@ -115,7 +112,7 @@ export const PrivateNotes = ({
                   disabled={isSaving || !hasChanges}
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  Save Notes
+                  Save
                 </Button>
               </div>
             </div>
@@ -123,29 +120,25 @@ export const PrivateNotes = ({
         ) : (
           <>
             {notes ? (
-              <div className="bg-muted/30 rounded-lg p-4">
+              <div className="bg-muted/30 rounded-lg p-3">
                 <p className="text-sm whitespace-pre-wrap">{notes}</p>
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <p className="text-sm">No notes added yet</p>
-                <p className="text-xs mt-1">Click "Edit" to add private notes</p>
+              <div className="text-center py-4 text-muted-foreground">
+                <p className="text-xs">No notes yet. Click "Add Notes" to add notes.</p>
               </div>
             )}
             {updatedAt && notes && (
-              <>
-                <Separator />
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>
-                    Last updated: {format(new Date(updatedAt), 'PPpp')}
-                  </span>
-                </div>
-              </>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                <span>
+                  Last updated: {format(new Date(updatedAt), 'PPpp')}
+                </span>
+              </div>
             )}
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
