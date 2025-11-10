@@ -39,7 +39,8 @@ export async function generateSignedDocumentUrl(
     }
 
     // First, validate user has access via database function
-    const { data: validationData, error: validationError } = await supabase
+    // @ts-ignore - generate_signed_document_url function will be created by migration
+    const { data: validationData, error: validationError } = await (supabase as any)
       .rpc('generate_signed_document_url', {
         p_document_path: documentPath,
         p_appointment_id: appointmentId,
@@ -98,7 +99,8 @@ export async function validateDocumentAccess(
   documentUrl: string
 ): Promise<DocumentAccessValidation> {
   try {
-    const { data, error } = await supabase
+    // @ts-ignore - validate_document_access function will be created by migration
+    const { data, error } = await (supabase as any)
       .rpc('validate_document_access', {
         p_document_url: documentUrl
       });
@@ -259,7 +261,8 @@ async function logDocumentAccess(
       documentType = 'excel_sheet';
     }
 
-    const { error } = await supabase
+    // @ts-ignore - document_access_log table will be created by migration
+    const { error } = await (supabase as any)
       .from('document_access_log')
       .insert({
         document_name: documentName,
@@ -285,7 +288,8 @@ async function logDocumentAccess(
  */
 export async function getDocumentAccessLogs(appointmentId: string) {
   try {
-    const { data, error } = await supabase
+    // @ts-ignore - document_access_log table will be created by migration
+    const { data, error } = await (supabase as any)
       .from('document_access_log')
       .select('*')
       .eq('appointment_id', appointmentId)

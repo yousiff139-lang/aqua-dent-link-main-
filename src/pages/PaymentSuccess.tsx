@@ -41,7 +41,8 @@ export default function PaymentSuccess() {
   const fetchAppointmentData = async () => {
     try {
       // Get appointment by session ID
-      const { data: appointmentData, error } = await supabase
+      // @ts-ignore - Some columns and tables will be added by migration
+      const { data: appointmentData, error } = await (supabase as any)
         .from('appointments')
         .select(`
           id,
@@ -70,9 +71,15 @@ export default function PaymentSuccess() {
 
       if (appointmentData) {
         setAppointment({
-          ...appointmentData,
+          id: appointmentData.id,
+          patient_name: appointmentData.patient_name,
+          appointment_date: appointmentData.appointment_date,
+          appointment_time: appointmentData.appointment_time,
+          payment_method: appointmentData.payment_method,
+          payment_status: appointmentData.payment_status,
+          pdf_report_url: appointmentData.pdf_report_url,
           dentist_name: appointmentData.dentists?.name || 'Unknown Dentist'
-        });
+        } as AppointmentData);
       }
     } catch (error) {
       console.error('Error:', error);

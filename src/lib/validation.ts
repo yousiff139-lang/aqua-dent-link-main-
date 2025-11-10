@@ -3,7 +3,25 @@
  * Provides client-side validation for forms, files, and booking data
  */
 
-import { BookingData, DocumentReference } from '@/types/chatbot';
+// Define BookingData interface for validation
+export interface BookingData {
+  patientId?: string;
+  dentistId?: string;
+  patientPhone?: string;
+  symptoms?: string;
+  appointmentTime?: Date;
+  conversationId?: string;
+  medicalHistory?: string;
+  causeIdentified?: boolean;
+  uncertaintyNote?: string;
+}
+
+export interface DocumentReference {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+}
 
 /**
  * Validation result interface

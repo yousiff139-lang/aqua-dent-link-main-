@@ -74,3 +74,4 @@ FOR EACH ROW EXECUTE FUNCTION public.audit_appointment_status();
 
 
 
+

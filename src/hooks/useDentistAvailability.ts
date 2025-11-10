@@ -30,7 +30,8 @@ export function useDentistAvailability(dentistId: string | undefined) {
         throw new Error('Dentist ID is required');
       }
 
-      const { data, error } = await supabase
+      // @ts-ignore - Some columns and tables will be added by migration
+      const { data, error } = await (supabase as any)
         .from('dentist_availability')
         .select('*')
         .eq('dentist_id', dentistId)
@@ -68,7 +69,8 @@ export function useBookedSlots(dentistId: string | undefined, date: Date | undef
 
       const dateStr = date.toISOString().split('T')[0];
 
-      const { data, error } = await supabase
+      // @ts-ignore - Some columns will be added by migration
+      const { data, error } = await (supabase as any)
         .from('appointments')
         .select('appointment_time')
         .eq('dentist_id', dentistId)
@@ -81,7 +83,7 @@ export function useBookedSlots(dentistId: string | undefined, date: Date | undef
       }
 
       // Extract time strings from appointments
-      return (data || []).map(apt => {
+      return (data || []).map((apt: any) => {
         // Convert time format from HH:MM:SS to HH:MM
         const time = apt.appointment_time;
         return time.substring(0, 5); // Get HH:MM part

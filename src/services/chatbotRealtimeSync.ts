@@ -48,7 +48,7 @@ export class ChatbotRealtimeSync {
 
             logger.info('Chatbot: Appointment change detected', {
               eventType,
-              appointmentId: payload.new?.id || payload.old?.id,
+              appointmentId: (payload.new as any)?.id || (payload.old as any)?.id,
             });
 
             if (eventType === 'INSERT' && callbacks.onAppointmentCreated && payload.new) {
@@ -80,19 +80,19 @@ export class ChatbotRealtimeSync {
           },
           (payload) => {
             // Only trigger if available_times changed
-            const oldTimes = JSON.stringify(payload.old?.available_times);
-            const newTimes = JSON.stringify(payload.new?.available_times);
+            const oldTimes = JSON.stringify((payload.old as any)?.available_times);
+            const newTimes = JSON.stringify((payload.new as any)?.available_times);
 
             if (oldTimes !== newTimes && payload.new) {
               logger.info('Chatbot: Availability change detected', {
-                dentistId: payload.new.id,
-                newTimes: payload.new.available_times,
+                dentistId: (payload.new as any).id,
+                newTimes: (payload.new as any).available_times,
               });
 
               if (callbacks.onAvailabilityUpdated) {
                 callbacks.onAvailabilityUpdated(
-                  payload.new.id,
-                  payload.new.available_times
+                  (payload.new as any).id,
+                  (payload.new as any).available_times
                 );
               }
             }

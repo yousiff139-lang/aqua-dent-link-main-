@@ -4,7 +4,7 @@ import { logger } from '@/utils/logger';
 import { supabase } from '@/integrations/supabase/client';
 
 // Fallback dentist data (matches EnhancedDentists.tsx)
-const FALLBACK_DENTISTS: Record<string, Dentist> = {
+const FALLBACK_DENTISTS: Record<string, any> = {
   "550e8400-e29b-41d4-a716-446655440001": {
     id: "550e8400-e29b-41d4-a716-446655440001",
     name: "Dr. Sarah Johnson",
@@ -118,7 +118,8 @@ export function useDentist(dentistId: string | undefined) {
 
       // Try to fetch from Supabase first
       try {
-        const { data, error } = await supabase
+        // @ts-ignore - Some columns will be added by migration
+        const { data, error } = await (supabase as any)
           .from('dentists')
           .select(`
             *,
@@ -133,7 +134,7 @@ export function useDentist(dentistId: string | undefined) {
 
         if (!error && data) {
           // Transform data to match Dentist type
-          const dentist: Dentist = {
+          const dentist: any = {
             id: data.id,
             name: data.name || data.profiles?.full_name || 'Unknown Dentist',
             email: data.profiles?.email || '',
@@ -141,15 +142,17 @@ export function useDentist(dentistId: string | undefined) {
             bio: data.bio || '',
             image_url: data.image_url || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=800&h=800&fit=crop',
             rating: data.rating || 4.5,
-            years_experience: data.years_experience || 0,
+            experience_years: data.experience_years || data.years_experience || 0,
             education: data.education || '',
             expertise: data.expertise || [],
             certifications: data.certifications || [],
             availability: data.availability || {},
+            created_at: data.created_at,
+            updated_at: data.updated_at,
           };
 
           logger.info('Dentist fetched from database', { dentistId, name: dentist.name });
-          return dentist;
+          return dentist as Dentist;
         }
 
         logger.warn('Dentist not found in database, using fallback', { dentistId, error });

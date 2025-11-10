@@ -49,15 +49,15 @@ const MyAppointments = () => {
     user?.id,
     'patient',
     {
-      onCreated: (newAppointment) => {
+      onAppointmentCreated: (newAppointment) => {
         refetch();
         console.log('🆕 New appointment received in real-time');
       },
-      onUpdated: (updatedAppointment) => {
+      onAppointmentUpdated: (updatedAppointment) => {
         refetch();
         console.log('🔄 Appointment updated in real-time');
       },
-      onDeleted: (deletedId) => {
+      onAppointmentDeleted: (deletedId) => {
         refetch();
         console.log('🗑️ Appointment deleted in real-time');
       },
@@ -281,10 +281,10 @@ const MyAppointments = () => {
                     </div>
 
                     {/* Notes */}
-                    {appointment.notes && (
+                    {(appointment as any).notes && (
                       <div className="mt-4 pt-4 border-t">
                         <p className="text-sm font-medium mb-1">Notes</p>
-                        <p className="text-sm text-muted-foreground">{appointment.notes}</p>
+                        <p className="text-sm text-muted-foreground">{(appointment as any).notes}</p>
                       </div>
                     )}
                   </CardContent>

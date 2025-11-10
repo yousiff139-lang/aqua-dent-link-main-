@@ -1,7 +1,7 @@
 // Dentist data hooks
 export { useDentist } from './useDentist';
 export { useDentists } from './useDentists';
-export type { Dentist } from './useDentist';
+export type { Dentist } from '@/types/dentist';
 
 // Other hooks
 export { useToast } from './use-toast';

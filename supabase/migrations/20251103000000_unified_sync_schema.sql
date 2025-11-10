@@ -81,3 +81,4 @@ ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
 
 
 
+

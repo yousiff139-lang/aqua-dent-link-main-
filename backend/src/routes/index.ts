@@ -5,6 +5,7 @@ import { profilesRouter } from './profiles.routes.js';
 import { dentistRouter } from './dentist.routes.js';
 import { paymentsRouter } from './payments.routes.js';
 import realtimeRouter from './realtime.routes.js';
+import { chatbotRouter } from './chatbot.routes.js';
 
 const router = Router();
 
@@ -21,6 +22,7 @@ const router = Router();
  * - /api/profiles/* - User profile management
  * - /api/dentists/* - Dentist-specific operations
  * - /api/realtime/* - Real-time synchronization endpoints
+ * - /api/chatbot/* - Chatbot conversation and PDF generation
  * - /api/auth/dentist/login - Dentist authentication
  */
 
@@ -30,6 +32,7 @@ router.use('/availability', availabilityRouter);
 router.use('/profiles', profilesRouter);
 router.use('/payments', paymentsRouter);
 router.use('/realtime', realtimeRouter);
+router.use('/chatbot', chatbotRouter); // Chatbot routes
 router.use('/', dentistRouter); // Dentist routes (includes /auth/dentist/login and /dentists/*)
 
 export default router;

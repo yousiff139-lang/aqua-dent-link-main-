@@ -27,6 +27,7 @@ describe('BookingForm', () => {
       initiateCheckout: vi.fn(),
       isProcessing: false,
       error: null,
+      clearError: vi.fn(),
     });
   });
 
@@ -69,6 +70,7 @@ describe('BookingForm', () => {
       initiateCheckout: vi.fn(),
       isProcessing: true,
       error: null,
+      clearError: vi.fn(),
     });
 
     render(<BookingForm {...mockProps} />);
@@ -82,6 +84,7 @@ describe('BookingForm', () => {
       initiateCheckout: vi.fn(),
       isProcessing: false,
       error: 'Payment initialization failed',
+      clearError: vi.fn(),
     });
 
     render(<BookingForm {...mockProps} />);

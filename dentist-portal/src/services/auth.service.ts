@@ -100,7 +100,6 @@ export const authService = {
         years_of_experience: dentistDirect.years_of_experience || (dentistDirect as any).experience_years || 0,
         education: (dentistDirect as any).education || '',
         bio: (dentistDirect as any).bio || '',
-        rating: dentistDirect.rating || 4.5,
         created_at: (dentistDirect as any).created_at || new Date().toISOString(),
         updated_at: (dentistDirect as any).updated_at || new Date().toISOString(),
       };

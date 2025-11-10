@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Appointment, AppointmentStatus } from '@/types';
+import { Appointment } from '@/types';
 
 export const appointmentService = {
   /**

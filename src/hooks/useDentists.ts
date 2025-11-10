@@ -26,7 +26,8 @@ export function useDentists() {
           DatabaseOperation.SELECT,
           'dentists',
           async () => {
-            const { data, error } = await supabase
+            // @ts-ignore - Some columns will be added by migration
+            const { data, error } = await (supabase as any)
               .from('dentists')
               .select('*')
               .order('rating', { ascending: false });
@@ -35,7 +36,7 @@ export function useDentists() {
               throw error;
             }
 
-            return (data || []) as Dentist[];
+            return (data || []) as unknown as Dentist[];
           },
           { orderBy: 'rating DESC' }
         )

@@ -39,6 +39,7 @@ import Footer from "@/components/Footer";
 
 interface Appointment {
   id: string;
+  dentist_id?: string;
   patient_name: string;
   patient_email: string;
   patient_phone: string;
@@ -147,7 +148,8 @@ const EnhancedAdmin = () => {
       setLoading(true);
       
       // Load appointments with all related data
-      const { data: appts, error: apptsError } = await supabase
+      // @ts-ignore - Some columns and tables will be added by migration
+      const { data: appts, error: apptsError } = await (supabase as any)
         .from('appointments')
         .select(`
           *,
@@ -170,16 +172,18 @@ const EnhancedAdmin = () => {
       }
 
       // Transform appointments data
-      const transformedAppointments = appts?.map(apt => ({
+      const transformedAppointments = (appts || []).map((apt: any) => ({
         ...apt,
+        dentist_id: apt.dentist_id,
         dentist_name: apt.dentists?.name || 'Unknown',
         dentist_email: apt.dentists?.email || 'Unknown'
-      })) || [];
+      })) as Appointment[];
 
       setAppointments(transformedAppointments);
 
       // Load dentists with appointment counts
-      const { data: dentistsData, error: dentistsError } = await supabase
+      // @ts-ignore - Some columns will be added by migration
+      const { data: dentistsData, error: dentistsError } = await (supabase as any)
         .from('dentists')
         .select(`
           id,

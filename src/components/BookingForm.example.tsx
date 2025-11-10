@@ -39,13 +39,19 @@ export function BookingFormWithCallbackExample() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [appointmentId, setAppointmentId] = useState<string>("");
 
-  const handleBookingSuccess = (id: string) => {
-    setAppointmentId(id);
+  const handleBookingSuccess = (data: { 
+    appointmentId: string; 
+    date: string; 
+    time: string; 
+    paymentMethod: "stripe" | "cash"; 
+    paymentStatus: "pending" | "paid"; 
+  }) => {
+    setAppointmentId(data.appointmentId);
     setShowConfirmation(true);
     
     // Show a success toast notification
     toast.success("Appointment booked successfully!", {
-      description: `Your appointment ID is ${id}`,
+      description: `Your appointment ID is ${data.appointmentId}`,
     });
   };
 
@@ -113,8 +119,8 @@ export function DentistProfileWithBookingExample() {
             dentistId="1"
             dentistName="Dr. Sarah Johnson"
             dentistEmail="dr.sarah.johnson@dental.com"
-            onSuccess={(id) => {
-              console.log("Appointment booked:", id);
+            onSuccess={(data) => {
+              console.log("Appointment booked:", data.appointmentId);
               // Handle success (e.g., show confirmation, redirect)
             }}
           />
@@ -148,9 +154,11 @@ export function DynamicBookingFormExample({ dentist }: { dentist: Dentist }) {
         dentistId={dentist.id}
         dentistName={dentist.name}
         dentistEmail={dentist.email}
-        onSuccess={(appointmentId) => {
+        onSuccess={(data) => {
           // Handle successful booking
-          console.log("Booked appointment:", appointmentId);
+          console.log("Booked appointment:", data.appointmentId);
+          console.log("Date:", data.date, "Time:", data.time);
+          console.log("Payment:", data.paymentMethod, data.paymentStatus);
         }}
       />
     </div>
@@ -166,7 +174,7 @@ export function DynamicBookingFormExample({ dentist }: { dentist: Dentist }) {
  * @param dentistName - Full name of the dentist (e.g., "Dr. Sarah Johnson")
  * @param dentistEmail - Email address of the dentist
  * @param onSuccess - Optional callback function called when booking succeeds
- *                    Receives the appointment ID as a parameter
+ *                    Receives an object with appointmentId, date, time, paymentMethod, and paymentStatus
  */
 
 /**

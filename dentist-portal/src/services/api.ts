@@ -37,7 +37,8 @@ api.interceptors.response.use(
     }
 
     // Handle other errors
-    const errorMessage = error.response?.data?.message || error.message || 'An error occurred';
+    const responseData = error.response?.data as { message?: string } | undefined;
+    const errorMessage = responseData?.message || error.message || 'An error occurred';
     
     return Promise.reject({
       message: errorMessage,

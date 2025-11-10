@@ -22,6 +22,7 @@ export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed';
  * Main Appointment interface matching the appointments table schema
  */
 export interface Appointment {
+  reason: ReactNode;
   id: string;
   patient_id: string;
   dentist_id?: string;

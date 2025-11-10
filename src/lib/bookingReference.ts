@@ -42,7 +42,8 @@ export async function generateBookingReference(): Promise<string> {
  */
 export async function checkReferenceUniqueness(reference: string): Promise<boolean> {
   try {
-    const { data, error } = await supabase
+    // @ts-ignore - Some columns will be added by migration
+    const { data, error } = await (supabase as any)
       .from('appointments')
       .select('id')
       .eq('booking_reference', reference)

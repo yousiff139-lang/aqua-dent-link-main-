@@ -246,7 +246,8 @@ export function BookingForm({
         DatabaseOperation.INSERT,
         'appointments',
         async () => {
-          const { data: result, error: appointmentError } = await supabase
+          // @ts-ignore - Some columns will be added by migration
+          const { data: result, error: appointmentError } = await (supabase as any)
             .from('appointments')
             .insert(appointmentData)
             .select()

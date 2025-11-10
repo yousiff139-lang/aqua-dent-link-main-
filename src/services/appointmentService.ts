@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, AxiosInstance } from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -117,7 +117,7 @@ export interface GetAppointmentsResponse {
 }
 
 export class AppointmentService {
-  private axiosInstance;
+  private axiosInstance: AxiosInstance;
 
   constructor() {
     this.axiosInstance = axios.create({
