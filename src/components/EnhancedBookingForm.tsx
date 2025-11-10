@@ -257,6 +257,7 @@ export function EnhancedBookingForm({
           status: 'upcoming',
           payment_method: data.paymentMethod,
           payment_status: 'pending',
+          booking_source: 'manual', // Mark as manual booking for sync tracking
         })
         .select()
         .single();

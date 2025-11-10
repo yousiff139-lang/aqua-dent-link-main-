@@ -43,7 +43,11 @@ export function useDentistAvailability(dentistId: string | undefined) {
         throw error;
       }
 
-      return (data || []) as DentistAvailability[];
+      // Map data and add composite id for compatibility
+      return (data || []).map((row: any) => ({
+        ...row,
+        id: `${row.dentist_id}-${row.day_of_week}`, // Generate composite id
+      })) as DentistAvailability[];
     },
     enabled: !!dentistId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -98,10 +102,17 @@ export function generateTimeSlotsForDate(
   bookedSlots: string[],
   slotDuration: number = 30
 ): TimeSlot[] {
-  const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const jsDayOfWeek = date.getDay(); // JavaScript: 0 = Sunday, 1 = Monday, etc.
   
-  // Find availability for this day of week
-  const dayAvailability = availability.filter(a => a.day_of_week === dayOfWeek);
+  // Convert JavaScript day to database convention (0=Monday, 1=Tuesday, ..., 6=Sunday)
+  // Database: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+  // JavaScript: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  const dbDayOfWeek = jsDayOfWeek === 0 ? 6 : jsDayOfWeek - 1;
+  
+  // Find availability for this day of week (try both conventions for compatibility)
+  const dayAvailability = availability.filter(a => 
+    a.day_of_week === jsDayOfWeek || a.day_of_week === dbDayOfWeek
+  );
   
   if (dayAvailability.length === 0) {
     return [];
@@ -149,10 +160,18 @@ export function generateTimeSlotsForDate(
 
 /**
  * Get day name from day of week number
+ * Database convention: 0=Monday, 1=Tuesday, ..., 6=Sunday
+ * (This matches ISO 8601 and our seed data)
  */
 export function getDayName(dayOfWeek: number): string {
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  return days[dayOfWeek] || 'Unknown';
+  // Database convention: 0=Monday, 1=Tuesday, ..., 6=Sunday
+  const dbDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  
+  if (dayOfWeek >= 0 && dayOfWeek <= 6) {
+    return dbDays[dayOfWeek] || 'Unknown';
+  }
+  
+  return 'Unknown';
 }
 
 /**

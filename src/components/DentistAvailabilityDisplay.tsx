@@ -76,7 +76,8 @@ export function DentistAvailabilityDisplay({ dentistId }: DentistAvailabilityDis
     return acc;
   }, {} as Record<number, DentistAvailability[]>);
 
-  // Sort days (0-6, Sunday to Saturday)
+  // Sort days (0-6) - Database convention: 0=Monday, 1=Tuesday, ..., 6=Sunday
+  // Already in correct order (Mon-Fri for our seed data 0-4)
   const sortedDays = Object.keys(groupedByDay)
     .map(Number)
     .sort((a, b) => a - b);

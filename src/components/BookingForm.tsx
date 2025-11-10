@@ -94,7 +94,7 @@ const bookingFormSchema = z.object({
 
 type BookingFormValues = z.infer<typeof bookingFormSchema>;
 
-// Generate time slots from 9 AM to 5 PM
+// Generate time slots from 9 AM to 5 PM (fallback only - should use dentist availability)
 const generateTimeSlots = () => {
   const slots = [];
   for (let hour = 9; hour <= 17; hour++) {
@@ -110,8 +110,6 @@ const generateTimeSlots = () => {
   }
   return slots;
 };
-
-const timeSlots = generateTimeSlots();
 
 interface BookingFormProps {
   dentistId: string;
@@ -155,15 +153,16 @@ export function BookingForm({
   const selectedDate = form.watch("date");
 
   // Fetch dentist availability and booked slots
-  const { data: availability } = useDentistAvailability(dentistId);
+  const { data: availability, isLoading: isLoadingAvailability } = useDentistAvailability(dentistId);
   const { data: bookedSlots, refetch: refetchBookedSlots } = useBookedSlots(dentistId, selectedDate);
 
   // Generate available time slots based on availability and bookings
-  const availableTimeSlots = selectedDate && availability && bookedSlots
+  const availableTimeSlots = selectedDate && availability && bookedSlots !== undefined
     ? generateTimeSlotsForDate(selectedDate, availability, bookedSlots)
     : [];
 
-  // Use availability-based slots if available, otherwise fall back to default slots
+  // Use availability-based slots ONLY - don't show fallback slots
+  // This ensures we only show times when dentist is actually available
   const displayTimeSlots = availableTimeSlots.length > 0
     ? availableTimeSlots.map(slot => ({
         value: slot.time,
@@ -174,7 +173,27 @@ export function BookingForm({
         }),
         disabled: slot.isBooked,
       }))
-    : timeSlots.map(slot => ({ ...slot, disabled: false }));
+    : []; // Empty array if no availability - don't show fallback slots
+
+  // Helper function to check if a date is available based on dentist schedule
+  const isDateAvailable = (date: Date): boolean => {
+    if (!availability || availability.length === 0) {
+      return false; // No availability data = not available
+    }
+
+    const jsDayOfWeek = date.getDay(); // JavaScript: 0 = Sunday, 1 = Monday, etc.
+    // Convert JavaScript day to database convention (0=Monday, 1=Tuesday, ..., 6=Sunday)
+    // Database: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+    // JavaScript: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+    const dbDayOfWeek = jsDayOfWeek === 0 ? 6 : jsDayOfWeek - 1;
+    
+    // Check if dentist has availability for this day of week
+    // Try both conventions for compatibility (some data might use JS convention)
+    return availability.some(a => {
+      const matchesDay = a.day_of_week === jsDayOfWeek || a.day_of_week === dbDayOfWeek;
+      return matchesDay && a.is_available === true;
+    });
+  };
 
   const onSubmit = async (data: BookingFormValues) => {
     setIsSubmitting(true);
@@ -220,6 +239,7 @@ export function BookingForm({
         payment_method: data.paymentMethod,
         payment_status: 'pending',
         booking_reference: bookingReference,
+        booking_source: 'manual', // Mark as manual booking for sync tracking
       };
       
       const appointment = await withDatabaseLogging(
@@ -558,9 +578,20 @@ export function BookingForm({
                         mode="single"
                         selected={field.value}
                         onSelect={field.onChange}
-                        disabled={(date) =>
-                          date < new Date(new Date().setHours(0, 0, 0, 0)) || isSubmitting || isStripeProcessing
-                        }
+                        disabled={(date) => {
+                          // Disable past dates
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          if (date < today) return true;
+                          
+                          // Disable if submitting
+                          if (isSubmitting || isStripeProcessing) return true;
+                          
+                          // Disable if dentist is not available on this day
+                          if (!isDateAvailable(date)) return true;
+                          
+                          return false;
+                        }}
                         initialFocus
                       />
                     </PopoverContent>
@@ -603,7 +634,13 @@ export function BookingForm({
                         ))
                       ) : (
                         <SelectItem value="no-slots" disabled>
-                          {selectedDate ? "No available slots for this date" : "Select a date first"}
+                          {selectedDate 
+                            ? (isLoadingAvailability 
+                              ? "Loading available times..." 
+                              : availability && availability.length === 0
+                                ? "Dentist has no availability set. Please contact directly."
+                                : "No available time slots for this date")
+                            : "Please select a date first"}
                         </SelectItem>
                       )}
                     </SelectContent>

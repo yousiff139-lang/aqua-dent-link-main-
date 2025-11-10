@@ -19,6 +19,7 @@ import {
 } from '@/types/chatbot';
 import { generateAppointmentPDF, pdfToBlob } from './pdfGenerator';
 import { searchDentalKnowledge, isDentalQuestion } from './dentalKnowledge';
+import { sendBookingConfirmation, sendNewBookingAlert } from './notificationService';
 
 /**
  * In-memory session storage
@@ -960,6 +961,7 @@ export class ChatbotService {
         payment_status: 'pending',
         status: 'pending',
         booking_reference: bookingReference,
+        booking_source: 'chatbot', // Mark as chatbot booking for sync tracking
       })
       .select()
       .single();
@@ -1048,6 +1050,21 @@ export class ChatbotService {
     } catch (pdfError) {
       console.error('Error generating PDF:', pdfError);
       // Don't fail the appointment creation if PDF fails
+    }
+
+    // Send notifications asynchronously (don't block on errors)
+    try {
+      await sendBookingConfirmation(appointment.id);
+    } catch (notifError) {
+      console.error('Error sending booking confirmation notification:', notifError);
+      // Don't throw - notification failures shouldn't break booking
+    }
+
+    try {
+      await sendNewBookingAlert(appointment.id);
+    } catch (notifError) {
+      console.error('Error sending new booking alert:', notifError);
+      // Don't throw - notification failures shouldn't break booking
     }
 
     // Real-time sync: The database trigger will automatically broadcast this
