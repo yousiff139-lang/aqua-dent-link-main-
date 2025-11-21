@@ -147,72 +147,75 @@ const EnhancedAdmin = () => {
     try {
       setLoading(true);
       
-      // Load appointments with all related data
-      // @ts-ignore - Some columns and tables will be added by migration
-      const { data: appts, error: apptsError } = await (supabase as any)
-        .from('appointments')
-        .select(`
-          *,
-          dentists!appointments_dentist_id_fkey (
-            name,
-            email
-          ),
-          medical_documents (
-            id,
-            file_name,
-            file_url,
-            file_type
-          )
-        `)
-        .order('created_at', { ascending: false });
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const ADMIN_API_KEY = import.meta.env.VITE_ADMIN_API_KEY;
 
-      if (apptsError) {
-        console.error('Error loading appointments:', apptsError);
-        throw apptsError;
+      console.log('🔍 Admin: Loading data from backend API...');
+
+      // Load appointments from backend
+      const appointmentsResponse = await fetch(`${API_URL}/api/admin/appointments`, {
+        headers: {
+          'x-admin-api-key': ADMIN_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!appointmentsResponse.ok) {
+        throw new Error(`Failed to load appointments: ${appointmentsResponse.statusText}`);
       }
 
+      const appointmentsResult = await appointmentsResponse.json();
+      const appts = appointmentsResult.data || [];
+
+      console.log(`✅ Admin: Loaded ${appts.length} appointments from backend`);
+
       // Transform appointments data
-      const transformedAppointments = (appts || []).map((apt: any) => ({
+      const transformedAppointments = appts.map((apt: any) => ({
         ...apt,
         dentist_id: apt.dentist_id,
-        dentist_name: apt.dentists?.name || 'Unknown',
-        dentist_email: apt.dentists?.email || 'Unknown'
+        dentist_name: apt.dentist_name || 'Unknown',
+        dentist_email: apt.dentist_email || 'Unknown',
+        chief_complaint: apt.chief_complaint || apt.symptoms || apt.appointment_reason || 'Not specified',
+        symptoms: apt.symptoms || apt.chief_complaint || 'Not specified'
       })) as Appointment[];
 
       setAppointments(transformedAppointments);
 
-      // Load dentists with appointment counts
-      // @ts-ignore - Some columns will be added by migration
-      const { data: dentistsData, error: dentistsError } = await (supabase as any)
-        .from('dentists')
-        .select(`
-          id,
-          name,
-          email,
-          specialization,
-          rating
-        `);
+      // Load dentists from backend
+      const dentistsResponse = await fetch(`${API_URL}/api/admin/dentists`, {
+        headers: {
+          'x-admin-api-key': ADMIN_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      if (dentistsError) {
-        console.error('Error loading dentists:', dentistsError);
-      } else {
-        // Calculate appointment counts for each dentist
-        const dentistsWithCounts = dentistsData?.map(dentist => ({
-          ...dentist,
-          appointment_count: transformedAppointments.filter(apt => apt.dentist_id === dentist.id).length
-        })) || [];
-        
-        setDentists(dentistsWithCounts);
+      if (!dentistsResponse.ok) {
+        throw new Error(`Failed to load dentists: ${dentistsResponse.statusText}`);
       }
 
-      // Calculate analytics
-      calculateAnalytics(transformedAppointments, dentistsData || []);
+      const dentistsResult = await dentistsResponse.json();
+      const dentistsData = dentistsResult.data || [];
 
-    } catch (error) {
-      console.error('Error loading data:', error);
+      console.log(`✅ Admin: Loaded ${dentistsData.length} dentists from backend`);
+
+      // Dentists already have appointment counts from backend
+      setDentists(dentistsData.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        email: d.email,
+        specialization: d.specialization,
+        rating: d.rating || 4.5,
+        appointment_count: d.totalAppointments || 0
+      })));
+
+      // Calculate analytics
+      calculateAnalytics(transformedAppointments, dentistsData);
+
+    } catch (error: any) {
+      console.error('❌ Admin: Error loading data:', error);
       toast({
         title: "Error",
-        description: "Failed to load data. Please try again.",
+        description: error.message || "Failed to load data. Please try again.",
         variant: "destructive"
       });
     } finally {

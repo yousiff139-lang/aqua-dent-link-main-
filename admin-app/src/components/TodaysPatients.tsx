@@ -13,7 +13,7 @@ interface Patient {
 }
 
 interface TodaysPatientsProps {
-  dentistId: string
+  dentistId: string | null
 }
 
 export function TodaysPatients({ dentistId }: TodaysPatientsProps) {
@@ -29,34 +29,42 @@ export function TodaysPatients({ dentistId }: TodaysPatientsProps) {
       setLoading(true)
       const today = new Date().toISOString().split('T')[0]
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('appointments')
         .select(`
           id,
           appointment_date,
+          appointment_time,
           appointment_type,
           status,
           notes,
+          patient_name,
           profiles!appointments_patient_id_fkey (
             full_name
           )
         `)
-        .eq('dentist_id', dentistId)
-        .gte('appointment_date', `${today}T00:00:00`)
-        .lte('appointment_date', `${today}T23:59:59`)
-        .order('appointment_date', { ascending: true })
+        .gte('appointment_date', today)
+        .lte('appointment_date', today)
+        .order('appointment_time', { ascending: true })
+
+      // If dentistId provided, filter by dentist, otherwise show all (for admin)
+      if (dentistId) {
+        query = query.eq('dentist_id', dentistId)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
 
       const formattedPatients: Patient[] = data?.map((apt: any) => ({
         id: apt.id,
-        patientName: apt.profiles?.full_name || 'Unknown Patient',
-        appointmentTime: new Date(apt.appointment_date).toLocaleTimeString('en-US', {
+        patientName: apt.patient_name || apt.profiles?.full_name || 'Unknown Patient',
+        appointmentTime: apt.appointment_time || new Date(apt.appointment_date).toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
           hour12: true
         }),
-        serviceType: apt.appointment_type,
+        serviceType: apt.appointment_type || 'General',
         status: apt.status,
         notes: apt.notes
       })) || []

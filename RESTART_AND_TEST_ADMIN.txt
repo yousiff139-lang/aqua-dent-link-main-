@@ -1,0 +1,73 @@
+================================================================================
+RESTART AND TEST ADMIN - FIXED!
+================================================================================
+
+I've fixed the "Failed to fetch" error by:
+1. Added ADMIN_API_KEY to backend/.env
+2. Added VITE_ADMIN_API_KEY to .env
+3. Updated admin page to use backend API instead of direct Supabase
+
+================================================================================
+STEP 1: RESTART BACKEND
+================================================================================
+
+cd backend
+# Kill if running
+taskkill /F /IM node.exe
+# Start backend
+npm run dev
+
+Wait for: "Server running on port 3000"
+
+================================================================================
+STEP 2: RESTART FRONTEND
+================================================================================
+
+# In NEW terminal (from main folder)
+npm run dev
+
+Wait for: "Local: http://localhost:5173"
+
+================================================================================
+STEP 3: TEST ADMIN PAGE
+================================================================================
+
+1. Open: http://localhost:5173
+2. Login as admin
+3. Go to Admin Dashboard
+4. Check browser console (F12)
+
+You should see:
+✅ Admin: Loading data from backend API...
+✅ Admin: Loaded X appointments from backend
+✅ Admin: Loaded X dentists from backend
+
+================================================================================
+WHAT'S FIXED
+================================================================================
+
+BEFORE:
+- Admin page → Direct Supabase calls → Failed (no auth)
+
+AFTER:
+- Admin page → Backend API → Success (with admin API key)
+
+================================================================================
+BACKEND ENDPOINTS NOW WORKING
+================================================================================
+
+✅ GET /api/admin/appointments - All appointments
+✅ GET /api/admin/patients - All patients
+✅ GET /api/admin/dentists - All dentists
+✅ POST /api/admin/dentists - Create dentist
+✅ DELETE /api/admin/dentists/:id - Delete dentist
+✅ GET /api/admin/analytics - System analytics
+
+================================================================================
+NEXT: ADD DENTIST MANAGEMENT UI
+================================================================================
+
+Once you confirm appointments/patients/dentists are loading,
+I'll add the "Add Dentist" and "Delete Dentist" buttons.
+
+================================================================================

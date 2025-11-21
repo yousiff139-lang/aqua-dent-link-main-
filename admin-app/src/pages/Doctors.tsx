@@ -4,47 +4,31 @@ import { DashboardLayout } from '@/components/DashboardLayout'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Users, Search, Edit, Trash2, Star, Plus } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import { useRealtimeSync } from '@/hooks/useRealtimeSync'
-import { toast } from 'sonner'
-
-interface Doctor {
-  id: string
-  name: string
-  email: string
-  specialization?: string
-  specialty?: string
-  years_of_experience?: number
-  rating?: number
-  bio?: string
-  profile_picture?: string
-  image_url?: string
-  status?: string
-  created_at?: string
-}
+import { Users, Search, Edit, Trash2, Plus, CalendarCheck, ClipboardList } from 'lucide-react'
+import { toast } from '@/components/Toaster'
+import api from '@/lib/api'
+import { AdminDentist, AdminDentistsResponse, DeleteDentistResponse } from '@/types/admin'
 
 export default function Doctors() {
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
-  const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [doctors, setDoctors] = useState<AdminDentist[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Fetch dentists from database
   const fetchDoctors = async () => {
     try {
       setIsLoading(true)
-      const { data, error } = await supabase
-        .from('dentists')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      setDoctors(data || [])
+      const response = await api.get<AdminDentistsResponse>('/admin/dentists')
+      // Response structure: { success: true, data: [...] }
+      const responseData = response as any
+      setDoctors(responseData.data || [])
     } catch (error: any) {
       console.error('Error fetching doctors:', error)
-      toast.error('Failed to load doctors')
+      toast({
+        title: 'Failed to load doctors',
+        description: error.message || 'Please try again later.',
+        variant: 'destructive',
+      })
     } finally {
       setIsLoading(false)
     }
@@ -54,47 +38,27 @@ export default function Doctors() {
     fetchDoctors()
   }, [])
 
-  // Real-time sync for dentists table
-  useRealtimeSync({
-    table: 'dentists',
-    onInsert: (newDoctor: any) => {
-      console.log('New dentist added:', newDoctor)
-      setDoctors((prev) => [newDoctor, ...prev])
-      toast.success(`New dentist ${newDoctor.name} added`)
-    },
-    onUpdate: (updatedDoctor: any) => {
-      console.log('Dentist updated:', updatedDoctor)
-      setDoctors((prev) =>
-        prev.map((d) => (d.id === updatedDoctor.id ? updatedDoctor : d))
-      )
-      toast.success(`Dentist ${updatedDoctor.name} updated`)
-    },
-    onDelete: (deletedId: string) => {
-      console.log('Dentist deleted:', deletedId)
-      setDoctors((prev) => prev.filter((d) => d.id !== deletedId))
-      toast.success('Dentist deleted')
-    },
-  })
-
-  const handleDeleteClick = (doctor: Doctor) => {
+  const handleDeleteClick = (doctor: AdminDentist) => {
     if (window.confirm(`Are you sure you want to delete ${doctor.name}? This will remove them from the system and they will no longer appear in the user portal or chatbot suggestions. This action cannot be undone.`)) {
       handleDelete(doctor)
     }
   }
 
-  const handleDelete = async (doctor: Doctor) => {
+  const handleDelete = async (doctor: AdminDentist) => {
     try {
-      const { error } = await supabase
-        .from('dentists')
-        .delete()
-        .eq('id', doctor.id)
-
-      if (error) throw error
-
-      toast.success(`Dr. ${doctor.name} has been deleted`)
+      await api.delete<DeleteDentistResponse>(`/admin/dentists/${doctor.id}`)
+      setDoctors((prev) => prev.filter((d) => d.id !== doctor.id))
+      toast({
+        title: 'Dentist deleted',
+        description: `${doctor.name} has been removed.`,
+      })
     } catch (error: any) {
       console.error('Error deleting doctor:', error)
-      toast.error('Failed to delete doctor')
+      toast({
+        title: 'Failed to delete doctor',
+        description: error.message || 'Please try again later.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -102,8 +66,7 @@ export default function Doctors() {
     (d) =>
       d.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       d.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      d.specialization?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      d.specialty?.toLowerCase().includes(searchQuery.toLowerCase())
+      d.specialization?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const activeDoctors = filteredDoctors.filter((d) => d.status !== 'inactive')
@@ -191,15 +154,14 @@ export default function Doctors() {
                     </p>
                     
                     <div className="mt-3 flex items-center gap-4 text-sm">
-                      {doctor.rating && (
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                          <span className="text-gray-600 font-semibold">{doctor.rating.toFixed(1)}</span>
-                        </div>
-                      )}
-                      {doctor.years_of_experience && (
-                        <span className="text-gray-600">{doctor.years_of_experience} years exp.</span>
-                      )}
+                      <div className="flex items-center gap-1 text-gray-600">
+                        <CalendarCheck className="w-4 h-4 text-emerald-500" />
+                        <span>{doctor.upcomingAppointments} upcoming</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-gray-600">
+                        <ClipboardList className="w-4 h-4 text-blue-500" />
+                        <span>{doctor.totalAppointments} total</span>
+                      </div>
                     </div>
 
                     {doctor.bio && (

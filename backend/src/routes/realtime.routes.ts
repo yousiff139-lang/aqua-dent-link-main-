@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import { realtimeController } from '../controllers/realtime.controller.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticateRequest } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -12,6 +12,6 @@ const router = Router();
 router.get('/health', (req, res) => realtimeController.healthCheck(req, res));
 
 // Get active subscriptions (requires authentication)
-router.get('/subscriptions', authenticate, (req, res) => realtimeController.getSubscriptions(req, res));
+router.get('/subscriptions', authenticateRequest, (req, res) => realtimeController.getSubscriptions(req, res));
 
 export default router;

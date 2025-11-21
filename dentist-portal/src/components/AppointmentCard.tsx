@@ -2,7 +2,7 @@ import { Appointment, AppointmentStatus } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, User, CreditCard, CheckCircle, CalendarClock, Mail, Phone, FileText, Download } from 'lucide-react';
+import { Calendar, Clock, User, CreditCard, CheckCircle, CalendarClock, Mail, Phone, FileText, Download, X } from 'lucide-react';
 import { format, parseISO, isFuture } from 'date-fns';
 
 import { PrivateNotes } from './PrivateNotes';
@@ -11,6 +11,7 @@ interface AppointmentCardProps {
   appointment: Appointment;
   onMarkComplete: (appointment: Appointment) => void;
   onReschedule: (appointment: Appointment) => void;
+  onCancel?: (appointment: Appointment) => void;
   onUpdateNotes?: (appointmentId: string, notes: string) => Promise<void>;
   isProcessing?: boolean;
 }
@@ -19,6 +20,7 @@ export const AppointmentCard = ({
   appointment,
   onMarkComplete,
   onReschedule,
+  onCancel,
   onUpdateNotes,
   isProcessing = false,
 }: AppointmentCardProps) => {
@@ -27,10 +29,11 @@ export const AppointmentCard = ({
     const variants: Record<AppointmentStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
       pending: { variant: 'secondary', label: 'Pending' },
       confirmed: { variant: 'default', label: 'Confirmed' },
+      upcoming: { variant: 'default', label: 'Upcoming' },
       completed: { variant: 'outline', label: 'Completed' },
       cancelled: { variant: 'destructive', label: 'Cancelled' },
     };
-    return variants[status];
+    return variants[status] ?? { variant: 'outline', label: status };
   };
 
   // Get payment status badge
@@ -87,7 +90,9 @@ export const AppointmentCard = ({
   const statusBadge = getStatusBadge(appointment.status);
   const paymentBadge = getPaymentStatusBadge(appointment.payment_status);
   const isFutureAppointment = isAppointmentFuture();
-  const canMarkComplete = (appointment.status === 'pending' || appointment.status === 'confirmed') && !isFutureAppointment;
+  const canMarkComplete =
+    (appointment.status === 'pending' || appointment.status === 'confirmed' || appointment.status === 'upcoming') &&
+    !isFutureAppointment;
   const canReschedule = appointment.status !== 'completed' && appointment.status !== 'cancelled';
   const isCompleted = appointment.status === 'completed';
 
@@ -227,6 +232,18 @@ export const AppointmentCard = ({
               >
                 <CalendarClock className="h-4 w-4 mr-2" />
                 Reschedule
+              </Button>
+            )}
+            {canReschedule && onCancel && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onCancel(appointment)}
+                disabled={isProcessing}
+                className="flex-1 transition-all hover:scale-105 text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel
               </Button>
             )}
             {appointment.pdf_report_url && (

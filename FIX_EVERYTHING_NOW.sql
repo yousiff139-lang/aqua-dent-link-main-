@@ -1,0 +1,4 @@
+-- ============================================================================
+-- COMPLETE FIX FOR ALL BACKEND ISSUES - WORKS WITH YOUR ACTUAL SCHEMA
+-- ============================================================================
+-- This fixes: Failed to fetch, mark as completed, add/rem

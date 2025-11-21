@@ -1,0 +1,110 @@
+================================================================================
+RESTART EVERYTHING - APPOINTMENTS WILL SHOW
+================================================================================
+
+WHAT I FIXED:
+1. Created dentist-portal/.env with correct Supabase credentials
+2. Simplified dentist portal to query by dentist_email (more reliable)
+3. Fixed admin page to query appointments directly
+4. Added console logging to debug
+
+================================================================================
+STEP 1: STOP EVERYTHING
+================================================================================
+
+Press Ctrl+C in ALL terminal windows running:
+- Main app (npm run dev)
+- Dentist portal (npm run dev)
+- Backend API (if separate)
+
+OR run this to kill all Node processes:
+taskkill /F /IM node.exe
+
+================================================================================
+STEP 2: START MAIN APP
+================================================================================
+
+npm run dev
+
+Wait for it to start (usually http://localhost:5173)
+
+================================================================================
+STEP 3: START DENTIST PORTAL
+================================================================================
+
+Open NEW terminal window:
+
+cd dentist-portal
+npm run dev
+
+Wait for it to start (usually http://localhost:5174)
+
+================================================================================
+STEP 4: TEST DENTIST PORTAL
+================================================================================
+
+1. Open: http://localhost:5174
+2. Login with: michael.chen@dentalcare.com (or any dentist email)
+3. Click "Appointments" in sidebar
+4. Open browser console (F12) and look for:
+   - "Fetching appointments for dentist email: ..."
+   - "Found X appointments for ..."
+
+APPOINTMENTS SHOULD NOW APPEAR!
+
+================================================================================
+STEP 5: TEST ADMIN PAGE
+================================================================================
+
+1. Open: http://localhost:5173
+2. Login as admin
+3. Go to Admin Dashboard
+4. Look in browser console for:
+   - "Loading appointments for admin..."
+   - "Loaded X appointments"
+
+APPOINTMENTS SHOULD NOW APPEAR!
+
+================================================================================
+WHAT TO CHECK IN BROWSER CONSOLE
+================================================================================
+
+If appointments still don't show, open browser console (F12) and look for:
+
+1. Network errors (red text)
+2. "Error fetching appointments" messages
+3. Supabase connection errors
+4. Environment variable errors
+
+================================================================================
+IF STILL NOT WORKING
+================================================================================
+
+Run this SQL in Supabase to see what's in the database:
+
+SELECT 
+  id,
+  patient_name,
+  dentist_name,
+  dentist_email,
+  appointment_date,
+  status
+FROM public.appointments
+ORDER BY created_at DESC
+LIMIT 10;
+
+Then check:
+- Do appointments exist? (If no, create a test appointment)
+- What is the dentist_email value?
+- Does it match the email you're logging in with?
+
+================================================================================
+KEY CHANGES MADE
+================================================================================
+
+1. dentist-portal/.env - CREATED with correct credentials
+2. dentist-portal/src/services/dentist.service.ts - Query by email only
+3. src/pages/EnhancedAdmin.tsx - Simplified appointment loading
+4. Added console.log statements for debugging
+
+================================================================================

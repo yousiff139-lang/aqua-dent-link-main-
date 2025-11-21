@@ -9,28 +9,30 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().default('3001').transform(Number),
   API_PREFIX: z.string().default('/api'),
-  
+
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
-  
-  CORS_ORIGIN: z.string().default('http://localhost:8000,http://localhost:3010'),
+
+  CORS_ORIGIN: z.string().default('http://localhost:8000,http://localhost:3000,http://localhost:3001,http://localhost:5173'),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
-  
+
   REDIS_URL: z.string().optional(),
   CACHE_TTL: z.string().default('3600').transform(Number),
-  
+
   JWT_SECRET: z.string().optional(),
-  
+
   // Stripe configuration
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_SUCCESS_URL: z.string().url().optional(),
   STRIPE_CANCEL_URL: z.string().url().optional(),
-  
+
   // Payment configuration
   DEFAULT_APPOINTMENT_AMOUNT: z.string().default('5000').transform(Number),
   PAYMENT_CURRENCY: z.string().default('usd'),
+
+  ADMIN_API_KEYS: z.string().optional(),
 });
 
 // Parse and validate environment variables
@@ -40,7 +42,7 @@ const parseEnv = () => {
   } catch (error) {
     if (error instanceof z.ZodError) {
       console.error('❌ Invalid environment variables:');
-      error.errors.forEach((err) => {
+      error.issues.forEach((err) => {
         console.error(`  - ${err.path.join('.')}: ${err.message}`);
       });
       process.exit(1);
@@ -53,3 +55,7 @@ export const env = parseEnv();
 
 // Export parsed CORS origins as array
 export const corsOrigins = env.CORS_ORIGIN.split(',').map(origin => origin.trim());
+
+export const adminApiKeys = env.ADMIN_API_KEYS
+  ? env.ADMIN_API_KEYS.split(',').map((key) => key.trim()).filter((key) => key.length > 0)
+  : [];

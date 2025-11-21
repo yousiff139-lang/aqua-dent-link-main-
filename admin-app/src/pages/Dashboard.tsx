@@ -5,6 +5,7 @@ import { DashboardLayout } from '@/components/DashboardLayout'
 import { Card } from '@/components/ui/card'
 import { Users, Calendar, CheckCircle, Clock } from 'lucide-react'
 import { TodaysPatients } from '@/components/TodaysPatients'
+import api from '@/lib/api'
 
 interface DashboardStats {
   totalPatients: number
@@ -35,61 +36,63 @@ export default function Dashboard() {
     try {
       setLoading(true)
 
-      // Get user ID and name from email
-      const { data: userData } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('email', user.email)
-        .single()
+      // Use backend API to get dashboard stats
+      try {
+        const result = await api.get<{ success: boolean; data: DashboardStats }>('/admin/dashboard/stats')
+        
+        if (result.success && result.data) {
+          setStats({
+            totalPatients: result.data.totalPatients || 0,
+            todayAppointments: result.data.todayAppointments || 0,
+            pendingAppointments: result.data.pendingAppointments || 0,
+            completedAppointments: result.data.completedAppointments || 0,
+          })
+        }
+      } catch (apiError) {
+        console.warn('API call failed, using fallback:', apiError)
+        // Fallback to direct Supabase query if API fails
+        const { data: appointments } = await supabase
+          .from('appointments')
+          .select('patient_id')
 
-      if (!userData) {
-        setLoading(false)
-        return
+        const uniquePatients = new Set(appointments?.map(a => a.patient_id).filter(Boolean) || [])
+        
+        const today = new Date().toISOString().split('T')[0]
+        const { count: todayCount } = await supabase
+          .from('appointments')
+          .select('*', { count: 'exact', head: true })
+          .gte('appointment_date', today)
+          .lte('appointment_date', today)
+
+        const { count: pendingCount } = await supabase
+          .from('appointments')
+          .select('*', { count: 'exact', head: true })
+          .in('status', ['pending', 'confirmed', 'upcoming'])
+
+        const { count: completedCount } = await supabase
+          .from('appointments')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'completed')
+
+        setStats({
+          totalPatients: uniquePatients.size,
+          todayAppointments: todayCount || 0,
+          pendingAppointments: pendingCount || 0,
+          completedAppointments: completedCount || 0,
+        })
       }
 
-      const userId = userData.id
-      setDentistId(userId)
-      setDentistName(userData.full_name || user.email || 'Doctor')
-
-      // Get total patients (unique patient IDs from appointments)
-      const { data: appointments } = await supabase
-        .from('appointments')
-        .select('patient_id')
-        .eq('dentist_id', userId)
-
-      const uniquePatients = new Set(appointments?.map(a => a.patient_id) || [])
-      
-      // Get today's appointments count
-      const today = new Date().toISOString().split('T')[0]
-      const { count: todayCount } = await supabase
-        .from('appointments')
-        .select('*', { count: 'exact', head: true })
-        .eq('dentist_id', userId)
-        .gte('appointment_date', today)
-        .lte('appointment_date', today)
-
-      // Get pending appointments
-      const { count: pendingCount } = await supabase
-        .from('appointments')
-        .select('*', { count: 'exact', head: true })
-        .eq('dentist_id', userId)
-        .eq('status', 'upcoming')
-
-      // Get completed appointments
-      const { count: completedCount } = await supabase
-        .from('appointments')
-        .select('*', { count: 'exact', head: true })
-        .eq('dentist_id', userId)
-        .eq('status', 'completed')
-
-      setStats({
-        totalPatients: uniquePatients.size,
-        todayAppointments: todayCount || 0,
-        pendingAppointments: pendingCount || 0,
-        completedAppointments: completedCount || 0,
-      })
+      // Set admin name
+      setDentistName(user.email || 'Admin')
     } catch (error) {
       console.error('Error loading dashboard:', error)
+      // Set zeros on error
+      setStats({
+        totalPatients: 0,
+        todayAppointments: 0,
+        pendingAppointments: 0,
+        completedAppointments: 0,
+      })
     } finally {
       setLoading(false)
     }

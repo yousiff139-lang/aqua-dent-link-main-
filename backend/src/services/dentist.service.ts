@@ -1,64 +1,116 @@
 import { supabase } from '../config/supabase.js';
 import { logger } from '../config/logger.js';
 import jwt from 'jsonwebtoken';
+import { AppError } from '../utils/errors.js';
+import { Appointment } from '../types/index.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// Allowed dentist emails
-const ALLOWED_DENTIST_EMAILS = [
-  'david.kim@dentalcare.com',
-  'lisa.thompson@dentalcare.com',
-  'james.wilson@dentalcare.com',
-  'emily.rodriguez@dentalcare.com',
-  'michael.chen@dentalcare.com',
-  'sarah.johnson@dentalcare.com',
-];
+const APPOINTMENT_STATUS_FILTERS = new Set(['pending', 'confirmed', 'upcoming', 'completed', 'cancelled']);
 
-// Dentist data for auto-creation
-const DENTIST_DATA: Record<string, { name: string; specialization: string; bio: string; experience: number; education: string }> = {
-  'david.kim@dentalcare.com': {
-    name: 'David Kim',
-    specialization: 'Orthodontics',
-    bio: 'Specialized in orthodontics with over 15 years of experience in teeth alignment and braces.',
-    experience: 15,
-    education: 'DDS, University of California'
-  },
-  'lisa.thompson@dentalcare.com': {
-    name: 'Lisa Thompson',
-    specialization: 'Pediatric Dentistry',
-    bio: 'Dedicated to providing gentle dental care for children and adolescents.',
-    experience: 12,
-    education: 'DMD, Harvard School of Dental Medicine'
-  },
-  'james.wilson@dentalcare.com': {
-    name: 'James Wilson',
-    specialization: 'Cosmetic Dentistry',
-    bio: 'Expert in cosmetic procedures including veneers, whitening, and smile makeovers.',
-    experience: 10,
-    education: 'DDS, NYU College of Dentistry'
-  },
-  'emily.rodriguez@dentalcare.com': {
-    name: 'Emily Rodriguez',
-    specialization: 'Endodontics',
-    bio: 'Specialist in root canal therapy and dental pain management.',
-    experience: 8,
-    education: 'DDS, University of Michigan'
-  },
-  'michael.chen@dentalcare.com': {
-    name: 'Michael Chen',
-    specialization: 'Periodontics',
-    bio: 'Focused on gum health and treatment of periodontal diseases.',
-    experience: 14,
-    education: 'DMD, Columbia University'
-  },
-  'sarah.johnson@dentalcare.com': {
-    name: 'Sarah Johnson',
-    specialization: 'General Dentistry',
-    bio: 'Comprehensive dental care for patients of all ages.',
-    experience: 20,
-    education: 'DDS, University of Pennsylvania'
-  }
+interface DentistPatientsFilters {
+  status?: string[];
+  from?: string;
+  to?: string;
+}
+
+const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+
+const transformDentistRecord = (record: any) => ({
+  id: record.id,
+  email: record.email,
+  full_name: record.name || record.full_name || 'Unknown Dentist',
+  specialization: record.specialization || record.expertise?.[0] || 'General Dentistry',
+  photo_url: record.image_url || null,
+  years_of_experience: record.years_of_experience ?? record.experience_years ?? 0,
+  education: record.education || '',
+  bio: record.bio || '',
+  rating: record.rating || 4.5,
+  created_at: record.created_at || new Date().toISOString(),
+  updated_at: record.updated_at || new Date().toISOString(),
+});
+
+const mapAppointmentRecord = (record: any): Appointment => {
+  const enrichedReason =
+    record.reason ||
+    record.symptoms ||
+    record.chief_complaint ||
+    record.appointment_reason ||
+    'Not specified';
+
+  return {
+    ...record,
+    reason: enrichedReason,
+  } as Appointment;
 };
+
+const filterStatuses = (statuses?: string[]): string[] | undefined => {
+  if (!statuses || statuses.length === 0) {
+    return undefined;
+  }
+
+  const normalized = statuses
+    .map((status) => status?.toLowerCase().trim())
+    .filter((status): status is string => Boolean(status) && APPOINTMENT_STATUS_FILTERS.has(status));
+
+  return normalized.length ? normalized : undefined;
+};
+
+const findDentistByEmail = async (email: string) => {
+  const normalizedEmail = normalizeEmail(email);
+
+  // First try dentists table
+  let { data, error } = await supabase
+    .from('dentists')
+    .select('*')
+    .ilike('email', normalizedEmail)
+    .maybeSingle();
+
+  // If not found in dentists table, try profiles table
+  if (!data && !error) {
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', normalizedEmail)
+      .eq('role', 'dentist')
+      .maybeSingle();
+
+    if (profileError) {
+      logger.error('Failed to query dentist by email', { email: normalizedEmail, error: profileError });
+      throw AppError.internal('Failed to load dentist profile');
+    }
+
+    if (profileData) {
+      // Transform profile to dentist format
+      data = {
+        id: profileData.id,
+        email: profileData.email,
+        name: profileData.full_name || 'Unknown Dentist',
+        specialization: 'General Dentistry',
+        phone: profileData.phone,
+        status: 'active',
+        created_at: profileData.created_at,
+        updated_at: profileData.updated_at,
+      };
+    }
+  } else if (error) {
+    logger.error('Failed to query dentist by email', { email: normalizedEmail, error });
+    throw AppError.internal('Failed to load dentist profile');
+  }
+
+  return data;
+};
+
+const issueDentistToken = (dentist: ReturnType<typeof transformDentistRecord>) =>
+  jwt.sign(
+    {
+      dentistId: dentist.id,
+      email: dentist.email,
+      role: 'dentist',
+    },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
 
 export const dentistService = {
   /**
@@ -66,58 +118,30 @@ export const dentistService = {
    */
   login: async (email: string) => {
     try {
-      // Check if email is in allowed list
-      if (!ALLOWED_DENTIST_EMAILS.includes(email.toLowerCase())) {
+      if (!email) {
+        throw AppError.validation('Email is required');
+      }
+
+      const dentistRecord = await findDentistByEmail(email);
+      if (!dentistRecord) {
+        logger.warn('Dentist login attempt failed - not found', { email });
         return null;
       }
 
-      // For now, use mock data since database tables aren't set up
-      // Generate a consistent UUID based on email
-      const dentistInfo = DENTIST_DATA[email];
-      const mockId = email.split('@')[0].replace(/\./g, '-');
-      
-      const dentist = {
-        id: mockId,
-        full_name: dentistInfo.name,
-        specialization: dentistInfo.specialization,
-        bio: dentistInfo.bio,
-        years_of_experience: dentistInfo.experience,
-        education: dentistInfo.education,
-        rating: 4.8,
-        photo_url: '',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      // Generate JWT token
-      const token = jwt.sign(
-        { 
-          dentistId: dentist.id, 
-          email: email,
-          type: 'dentist'
-        },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
+      const dentist = transformDentistRecord(dentistRecord);
+      const token = issueDentistToken(dentist);
 
       return {
         token,
-        dentist: {
-          id: dentist.id,
-          email: email,
-          full_name: dentist.full_name || 'Dr. ' + email.split('@')[0],
-          specialization: dentist.specialization || 'General Dentistry',
-          photo_url: dentist.photo_url,
-          years_of_experience: dentist.years_of_experience,
-          education: dentist.education,
-          bio: dentist.bio,
-          created_at: dentist.created_at,
-          updated_at: dentist.updated_at,
-        },
+        dentist,
       };
     } catch (error) {
-      logger.error('Dentist login service error', { error });
-      throw error;
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error('Dentist login service error', { email, error });
+      throw AppError.internal('Failed to login dentist');
     }
   },
 
@@ -126,44 +150,82 @@ export const dentistService = {
    */
   getByEmail: async (email: string) => {
     try {
-      // Check if email is in allowed list
-      if (!ALLOWED_DENTIST_EMAILS.includes(email.toLowerCase())) {
+      if (!email) {
+        throw AppError.validation('Email is required');
+      }
+
+      const dentistRecord = await findDentistByEmail(email);
+      if (!dentistRecord) {
         return null;
       }
 
-      const dentistInfo = DENTIST_DATA[email];
-      const mockId = email.split('@')[0].replace(/\./g, '-');
-
-      return {
-        id: mockId,
-        email: email,
-        full_name: dentistInfo.name,
-        specialization: dentistInfo.specialization,
-        photo_url: undefined,
-        years_of_experience: dentistInfo.experience,
-        education: dentistInfo.education,
-        bio: dentistInfo.bio,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      return transformDentistRecord(dentistRecord);
     } catch (error) {
-      logger.error('Get dentist by email service error', { error });
-      throw error;
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error('Get dentist by email service error', { email, error });
+      throw AppError.internal('Failed to load dentist profile');
     }
   },
 
   /**
    * Get dentist's patients/appointments
    */
-  getPatients: async (email: string, filters?: { status?: string; from?: string; to?: string }) => {
+  getPatients: async (email: string, filters: DentistPatientsFilters = {}) => {
     try {
-      // For now, return empty array since database isn't set up
-      // In production, this would query the appointments table
-      logger.info('Getting patients for dentist', { email });
-      return [];
+      if (!email) {
+        throw AppError.validation('Email is required');
+      }
+
+      const dentistRecord = await findDentistByEmail(email);
+      if (!dentistRecord) {
+        throw AppError.notFound('Dentist not found');
+      }
+
+      const normalizedStatuses = filterStatuses(filters.status);
+
+      // Query appointments by dentist_id OR dentist_email (for compatibility)
+      let query = supabase
+        .from('appointments')
+        .select('*')
+        .or(`dentist_id.eq.${dentistRecord.id},dentist_email.eq.${email}`)
+        .order('appointment_date', { ascending: true })
+        .order('appointment_time', { ascending: true });
+
+      if (normalizedStatuses?.length) {
+        query = query.in('status', normalizedStatuses);
+      }
+
+      if (filters.from) {
+        query = query.gte('appointment_date', filters.from);
+      }
+
+      if (filters.to) {
+        query = query.lte('appointment_date', filters.to);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        logger.error('Failed to fetch dentist appointments', {
+          email,
+          dentistId: dentistRecord.id,
+          filters,
+          error,
+        });
+        throw AppError.internal('Failed to fetch dentist appointments');
+      }
+
+      return (data || []).map((record) => mapAppointmentRecord(record));
     } catch (error) {
-      logger.error('Get dentist patients service error', { error });
-      throw error;
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error('Get dentist patients service error', { email, filters, error });
+      throw AppError.internal('Failed to fetch dentist appointments');
     }
   },
 };

@@ -1,116 +1,96 @@
-import { supabase } from '@/lib/supabase';
+import api from '@/services/api';
 import { Appointment } from '@/types';
+
+const unwrapAppointment = (response: any): Appointment => {
+  // Handle axios response structure: response.data = { success: true, data: {...} }
+  // Or direct response: { success: true, data: {...} }
+  let payload;
+  
+  if (response?.data) {
+    // Axios wraps the response
+    payload = response.data.data ?? response.data;
+  } else {
+    // Direct response
+    payload = response;
+  }
+
+  // If payload is the appointment object directly
+  if (payload && typeof payload === 'object' && payload.id) {
+    return payload as Appointment;
+  }
+
+  // If payload is wrapped in another structure
+  if (payload && typeof payload === 'object' && payload.data && payload.data.id) {
+    return payload.data as Appointment;
+  }
+
+  console.error('Invalid appointment response:', response);
+  throw new Error('Appointment response did not include valid data');
+};
+
+const performUpdate = async (id: string, updates: Record<string, any>): Promise<Appointment> => {
+  try {
+    const response = await api.put(`/appointments/${id}`, updates);
+    return unwrapAppointment(response);
+  } catch (error: any) {
+    const message =
+      error?.response?.data?.error?.message ||
+      error.message ||
+      'Failed to update appointment. Please try again.';
+    throw new Error(message);
+  }
+};
 
 export const appointmentService = {
   /**
-   * Update appointment status and/or notes in Supabase
+   * Update appointment status and/or notes via backend API
    */
   updateStatus: async (id: string, status?: string, notes?: string): Promise<Appointment> => {
-    try {
-      const payload: any = { updated_at: new Date().toISOString() };
+    const payload: Record<string, any> = {};
       if (status) payload.status = status;
       if (notes !== undefined) payload.notes = notes;
-      
-      const { data, error } = await supabase
-        .from('appointments')
-        .update(payload)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as Appointment;
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to update appointment status. Please try again.');
-    }
+    return performUpdate(id, payload);
   },
 
   /**
    * Mark appointment as completed
    */
   markComplete: async (id: string): Promise<Appointment> => {
-    try {
-      const { data, error } = await supabase
-        .from('appointments')
-        .update({ 
-          status: 'completed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as Appointment;
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to mark appointment as completed. Please try again.');
-    }
+    return performUpdate(id, { status: 'completed' });
   },
 
   /**
    * Reschedule appointment to a new date and time
    */
   reschedule: async (id: string, date: string, time: string): Promise<Appointment> => {
-    try {
-      const { data, error } = await supabase
-        .from('appointments')
-        .update({ 
+    return performUpdate(id, {
           appointment_date: date,
           appointment_time: time,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as Appointment;
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to reschedule appointment. Please try again.');
-    }
+    });
   },
 
   /**
    * Update appointment with partial data
    */
   update: async (id: string, data: Partial<Appointment>): Promise<Appointment> => {
-    try {
-      const { data: updated, error } = await supabase
-        .from('appointments')
-        .update({ 
-          ...data,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return updated as Appointment;
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to update appointment. Please try again.');
-    }
+    return performUpdate(id, data);
   },
 
   /**
    * Save private notes for an appointment
    */
   saveNotes: async (id: string, notes: string): Promise<Appointment> => {
-    try {
-      const { data, error } = await supabase
-        .from('appointments')
-        .update({ 
-          notes,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
+    return performUpdate(id, { notes });
+  },
 
-      if (error) throw error;
-      return data as Appointment;
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to save notes. Please try again.');
-    }
+  /**
+   * Cancel an appointment
+   */
+  cancel: async (id: string, reason?: string): Promise<Appointment> => {
+    return performUpdate(id, { 
+      status: 'cancelled',
+      cancellation_reason: reason,
+      cancelled_at: new Date().toISOString(),
+    });
   },
 };

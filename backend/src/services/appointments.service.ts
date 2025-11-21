@@ -149,7 +149,21 @@ export class AppointmentsService {
       const isPatient = existing.patient_id === userId;
       const isDentist = existing.dentist_id === userId;
       
-      if (!isPatient && !isDentist) {
+      // Also check by email (for dentist portal authentication)
+      let isDentistByEmail = false;
+      if (!isDentist && userId) {
+        const { data: userProfile } = await (await import('../config/supabase.js')).supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', userId)
+          .single();
+        
+        if (userProfile?.email === existing.dentist_email) {
+          isDentistByEmail = true;
+        }
+      }
+      
+      if (!isPatient && !isDentist && !isDentistByEmail) {
         throw AppError.forbidden('Not authorized to update this appointment');
       }
 
@@ -333,7 +347,7 @@ export class AppointmentsService {
   /**
    * Mark appointment as completed (for dentists)
    */
-  async markAppointmentComplete(id: string, dentistId: string): Promise<Appointment> {
+  async markAppointmentComplete(id: string, userId: string): Promise<Appointment> {
     try {
       // Verify appointment exists
       const existing = await appointmentsRepository.findById(id);
@@ -342,34 +356,72 @@ export class AppointmentsService {
         throw AppError.notFound('Appointment not found');
       }
 
-      // Check if user is the dentist for this appointment
-      if (existing.dentist_id !== dentistId) {
+      const supabaseClient = (await import('../config/supabase.js')).supabase;
+
+      // Get user profile to check if they're a dentist
+      const { data: userProfile, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('id, email, role')
+        .eq('id', userId)
+        .single();
+
+      if (profileError || !userProfile) {
+        logger.error('Failed to find user profile', { userId, error: profileError });
         throw AppError.forbidden('Not authorized to complete this appointment');
       }
 
-      // Check if appointment is in the past or today
-      const appointmentDate = new Date(existing.appointment_date);
-      const today = new Date();
-      today.setHours(23, 59, 59, 999);
-      
-      if (appointmentDate > today) {
-        throw AppError.validation('Cannot mark future appointments as completed');
+      // Check if user is a dentist (from dentists table or user_roles)
+      const { data: dentistRecord } = await supabaseClient
+        .from('dentists')
+        .select('id, email')
+        .eq('id', userId)
+        .maybeSingle();
+
+      const { data: userRole } = await supabaseClient
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const isDentist = !!dentistRecord || userRole?.role === 'dentist' || userProfile.role === 'dentist';
+      const isAdmin = userRole?.role === 'admin' || userProfile.role === 'admin';
+
+      // Check if user is the dentist for this appointment (by email or ID)
+      const isAuthorized = isAdmin || 
+                          (isDentist && (userProfile.email === existing.dentist_email || 
+                                       existing.dentist_id === userId ||
+                                       dentistRecord?.email === existing.dentist_email));
+
+      if (!isAuthorized) {
+        logger.warn('Unauthorized attempt to mark appointment complete', {
+          userId,
+          userEmail: userProfile.email,
+          appointmentId: id,
+          dentistEmail: existing.dentist_email,
+          dentistId: existing.dentist_id,
+          isDentist,
+          isAdmin,
+        });
+        throw AppError.forbidden('Not authorized to complete this appointment');
       }
 
+      // Allow marking as completed even for future appointments (dentist discretion)
       // Update status to completed
       const updated = await appointmentsRepository.update(id, {
         status: 'completed',
+        completed_at: new Date().toISOString(),
       });
 
       logger.info('Appointment marked as completed', {
         appointmentId: id,
-        dentistId,
+        userId,
+        dentistEmail: existing.dentist_email,
       });
 
       return updated;
     } catch (error) {
       if (error instanceof AppError) throw error;
-      logger.error('Failed to mark appointment complete', { id, dentistId, error });
+      logger.error('Failed to mark appointment complete', { id, userId, error });
       throw AppError.internal('Failed to mark appointment complete');
     }
   }

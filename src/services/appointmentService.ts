@@ -219,6 +219,54 @@ export class AppointmentService {
       )
     );
   }
+
+  /**
+   * Cancel an appointment using the database function
+   * @param appointmentId - The UUID of the appointment to cancel
+   * @param reason - Optional cancellation reason
+   */
+  async cancelAppointment(appointmentId: string, reason?: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // Import supabase client
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Call the cancel_appointment database function
+      // @ts-ignore - cancel_appointment function will be added by migration
+      const { data, error } = await (supabase as any).rpc('cancel_appointment', {
+        p_appointment_id: appointmentId,
+        p_cancellation_reason: reason || 'Cancelled by patient'
+      });
+
+      if (error) {
+        console.error('Error cancelling appointment:', error);
+        throw new Error(error.message || 'Failed to cancel appointment');
+      }
+
+      // The function returns a JSONB object with success and message
+      if (data && typeof data === 'object') {
+        if ((data as any).success === false) {
+          throw new Error((data as any).error || 'Failed to cancel appointment');
+        }
+        return {
+          success: true,
+          message: (data as any).message || 'Appointment cancelled successfully'
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Appointment cancelled successfully'
+      };
+    } catch (error: any) {
+      console.error('Cancel appointment error:', error);
+      throw new Error(
+        getUserFriendlyErrorMessage(
+          error,
+          'Failed to cancel appointment. Please try again.'
+        )
+      );
+    }
+  }
 }
 
 export const appointmentService = new AppointmentService();

@@ -1,0 +1,67 @@
+================================================================================
+FINAL DEBUG STEPS - DO THIS NOW
+================================================================================
+
+The appointments aren't showing because of an EMAIL MISMATCH.
+
+STEP 1: RUN THE SQL QUERY
+--------------------------
+1. Go to Supabase Dashboard
+2. Click "SQL Editor"
+3. Click "New Query"
+4. Copy and paste ALL of RUN_THIS_SQL_NOW.sql
+5. Click "Run"
+6. Look at the results
+
+STEP 2: FIND THE MISMATCH
+--------------------------
+Look for this section in the results:
+"=== EMAIL MISMATCH CHECK ==="
+
+You'll see something like:
+- appointment_email: "dr.chen@example.com"
+- dentist_table_email: "michael.chen@dentalcare.com"
+- status: "❌ MISMATCH - THIS IS THE PROBLEM!"
+
+STEP 3: FIX THE MISMATCH
+-------------------------
+In the SQL query, find this section:
+/*
+UPDATE public.appointments
+SET dentist_email = 'michael.chen@dentalcare.com'  -- The email you LOGIN with
+WHERE dentist_name ILIKE '%michael%chen%';
+*/
+
+REMOVE the /* and */ to uncomment it
+REPLACE 'michael.chen@dentalcare.com' with YOUR actual login email
+Run the query again
+
+STEP 4: RESTART DENTIST PORTAL
+-------------------------------
+taskkill /F /IM node.exe
+cd dentist-portal
+npm run dev
+
+STEP 5: TEST
+------------
+1. Open http://localhost:5174
+2. Login with the SAME email you used in the SQL UPDATE
+3. Go to Appointments
+4. They should now appear!
+
+STEP 6: CHECK BROWSER CONSOLE
+------------------------------
+If still not working, press F12 and look for:
+- 👨‍⚕️ AppointmentsTab - Dentist Email: [what email?]
+- 🔍 Fetching appointments for dentist: [what email?]
+- ✅ Fetched appointments: [how many?]
+
+TELL ME:
+--------
+1. What email is in the appointments table? (from SQL query)
+2. What email are you logging in with?
+3. What does the browser console say?
+
+THE PROBLEM IS 99% AN EMAIL MISMATCH!
+
+================================================================================

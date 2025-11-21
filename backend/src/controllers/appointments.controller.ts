@@ -212,6 +212,22 @@ export class AppointmentsController {
     const validatedData = validationService.validateUpdateAppointment(req.body);
 
     try {
+      // If marking as completed, use the dedicated method
+      if (validatedData.status === 'completed') {
+        const appointment = await appointmentsService.markAppointmentComplete(id, userId);
+        
+        logger.info('Appointment marked as completed', {
+          appointmentId: id,
+          userId,
+        });
+
+        res.json({
+          success: true,
+          data: appointment,
+        });
+        return;
+      }
+
       // Update appointment
       const appointment = await appointmentsService.updateAppointment(
         id,

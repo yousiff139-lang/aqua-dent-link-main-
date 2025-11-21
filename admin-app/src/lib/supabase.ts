@@ -1,26 +1,30 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
-if (!supabaseUrl) {
-  console.error('Missing VITE_SUPABASE_URL environment variable')
-  console.error('Please check admin-app/.env file')
-  throw new Error('Missing VITE_SUPABASE_URL environment variable. Check admin-app/.env file.')
+// Create a dummy client if env vars are missing (prevents app crash)
+// The app will show errors when trying to use Supabase, but won't crash on load
+const createSupabaseClient = () => {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('⚠️ Missing Supabase environment variables. Some features may not work.')
+    console.warn('Please check admin-app/.env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set')
+    // Return a dummy client that will fail gracefully
+    return createClient('https://placeholder.supabase.co', 'placeholder-key', {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    })
+  }
+
+  console.log('✅ Supabase client initialized successfully')
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  })
 }
 
-if (!supabaseAnonKey) {
-  console.error('Missing VITE_SUPABASE_ANON_KEY environment variable')
-  console.error('Please check admin-app/.env file')
-  throw new Error('Missing VITE_SUPABASE_ANON_KEY environment variable. Check admin-app/.env file.')
-}
-
-console.log('✅ Supabase client initialized successfully')
-console.log('Supabase URL:', supabaseUrl)
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-})
+export const supabase = createSupabaseClient()

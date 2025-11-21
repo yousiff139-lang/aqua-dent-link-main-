@@ -19,6 +19,8 @@ export const useAppointments = (
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const serializedFilters = JSON.stringify(filters ?? {});
+
   const fetchAppointments = useCallback(async () => {
     if (!dentistEmail) {
       setIsLoading(false);
@@ -29,7 +31,6 @@ export const useAppointments = (
       setIsLoading(true);
       setError(null);
 
-      // Use dentistService to fetch appointments from Supabase
       const data = await dentistService.getPatients(dentistEmail, filters);
       setAppointments(data);
     } catch (err: any) {
@@ -40,12 +41,11 @@ export const useAppointments = (
       }
       
       setError(errorMessage);
-      console.error('Error fetching appointments:', err);
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, [dentistEmail, filters?.status, filters?.date_from, filters?.date_to, filters?.limit, filters?.offset]);
+  }, [dentistEmail, serializedFilters]);
 
   useEffect(() => {
     fetchAppointments();
@@ -56,6 +56,7 @@ export const useAppointments = (
     if (!dentistEmail) return;
 
     // Subscribe to appointments table changes for this dentist
+    // Listen for changes by dentist_email (most reliable)
     const channel = supabase
       .channel('appointments-changes')
       .on(
@@ -70,18 +71,12 @@ export const useAppointments = (
           console.log('Real-time appointment update:', payload);
 
           if (payload.eventType === 'INSERT') {
-            // Add new appointment
-            const newAppointment = payload.new as Appointment;
-            setAppointments((prev) => [newAppointment, ...prev]);
+            // Refetch to get complete data
+            fetchAppointments();
             toast.success('New appointment received!');
           } else if (payload.eventType === 'UPDATE') {
-            // Update existing appointment
-            const updatedAppointment = payload.new as Appointment;
-            setAppointments((prev) =>
-              prev.map((apt) =>
-                apt.id === updatedAppointment.id ? updatedAppointment : apt
-              )
-            );
+            // Refetch to ensure consistency
+            fetchAppointments();
           } else if (payload.eventType === 'DELETE') {
             // Remove deleted appointment
             const deletedId = payload.old.id;
@@ -95,7 +90,7 @@ export const useAppointments = (
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [dentistEmail]);
+  }, [dentistEmail, fetchAppointments]);
 
   return {
     appointments,

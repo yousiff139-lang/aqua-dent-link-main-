@@ -1,0 +1,69 @@
+================================================================================
+DENTIST PORTAL - APPOINTMENT FIX TEST GUIDE
+================================================================================
+
+PROBLEM: Appointments in database but not showing in dentist portal
+SOLUTION: Query by BOTH dentist_id AND dentist_email
+
+================================================================================
+QUICK TEST STEPS
+================================================================================
+
+1. START DENTIST PORTAL
+   cd dentist-portal
+   npm run dev
+
+2. OPEN BROWSER
+   http://localhost:5174
+
+3. LOGIN
+   Email: michael.chen@dentalcare.com (or your dentist email)
+
+4. GO TO APPOINTMENTS
+   Click "Appointments" in sidebar
+
+5. VERIFY
+   ✅ Appointments should now appear
+   ✅ Can filter by status
+   ✅ Can switch card/table view
+   ✅ Real-time updates work
+
+================================================================================
+FILES CHANGED
+================================================================================
+
+1. dentist-portal/src/services/dentist.service.ts
+   - Now queries by BOTH dentist_id AND dentist_email
+   - Merges results and removes duplicates
+
+2. dentist-portal/src/hooks/useAppointments.ts
+   - Improved real-time subscription
+   - Refetches on INSERT/UPDATE for consistency
+
+================================================================================
+WHAT WAS FIXED
+================================================================================
+
+BEFORE:
+- Only queried: WHERE dentist_id = 'xxx'
+- Missed appointments where dentist_id doesn't match auth ID
+
+AFTER:
+- Queries: WHERE dentist_id = 'xxx' OR dentist_email = 'doctor@example.com'
+- Catches ALL appointments for this dentist
+
+================================================================================
+IF STILL NOT WORKING
+================================================================================
+
+Run this SQL in Supabase to fix dentist_id values:
+
+UPDATE public.appointments a
+SET dentist_id = u.id
+FROM auth.users u
+WHERE u.email = a.dentist_email
+AND (a.dentist_id IS NULL OR a.dentist_id != u.id);
+
+Then restart dentist portal.
+
+================================================================================

@@ -129,3 +129,6 @@ export const optionalAuth = async (
     next();
   }
 };
+
+// Alias for backward compatibility
+export const authenticate = authenticateRequest;

@@ -1,4 +1,4 @@
-export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type AppointmentStatus = 'pending' | 'confirmed' | 'upcoming' | 'completed' | 'cancelled';
 export type PaymentMethod = 'stripe' | 'cash';
 export type PaymentStatus = 'pending' | 'paid' | 'failed';
 
@@ -32,6 +32,7 @@ export interface Appointment {
   documents?: DocumentReference[];
   booking_summary_url?: string;
   excel_sheet_url?: string;
+  pdf_report_url?: string;
   booking_reference?: string;
   conversation_id?: string;
   cancellation_reason?: string;

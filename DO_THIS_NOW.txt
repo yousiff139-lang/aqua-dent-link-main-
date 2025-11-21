@@ -1,0 +1,71 @@
+================================================================================
+DO THIS NOW - DEBUG APPOINTMENTS
+================================================================================
+
+I've added detailed console logging to show EXACTLY what's happening.
+
+STEP 1: RESTART EVERYTHING
+---------------------------
+taskkill /F /IM node.exe
+npm run dev
+
+(NEW TERMINAL)
+cd dentist-portal
+npm run dev
+
+STEP 2: OPEN BROWSER CONSOLE
+-----------------------------
+Press F12 to open Developer Tools
+Go to "Console" tab
+Keep it open!
+
+STEP 3: TEST DENTIST PORTAL
+----------------------------
+1. Go to: http://localhost:5174
+2. Login with: michael.chen@dentalcare.com (or your dentist email)
+3. Click "Appointments"
+4. LOOK AT CONSOLE - You'll see:
+   👨‍⚕️ AppointmentsTab - Dentist: ...
+   📧 AppointmentsTab - Dentist Email: ...
+   🔍 Fetching appointments for dentist: ...
+   ✅ Fetched appointments: X appointments
+
+STEP 4: TEST ADMIN PAGE
+------------------------
+1. Go to: http://localhost:5173
+2. Login as admin
+3. Go to Admin Dashboard
+4. LOOK AT CONSOLE - You'll see:
+   🔍 Admin: Loading appointments...
+   ✅ Admin: Loaded X appointments
+
+STEP 5: CHECK DATABASE
+----------------------
+Run this in Supabase SQL Editor:
+
+SELECT 
+  dentist_email,
+  COUNT(*) as count
+FROM public.appointments
+GROUP BY dentist_email;
+
+STEP 6: TELL ME
+---------------
+1. What does the console say?
+2. How many appointments in database?
+3. What is the dentist_email value?
+4. What email are you logging in with?
+
+Then I can fix it!
+
+================================================================================
+THE CONSOLE LOGS WILL TELL US EXACTLY WHAT'S WRONG
+================================================================================
+
+Look for:
+- ❌ Red errors
+- 🔍 What email it's searching for
+- ✅ How many appointments it found
+- 📋 The actual appointment data
+
+================================================================================

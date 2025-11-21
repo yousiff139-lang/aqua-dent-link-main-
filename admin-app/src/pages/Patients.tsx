@@ -1,94 +1,63 @@
-import { useEffect, useState } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { supabase } from '@/lib/supabase'
+import { useEffect, useMemo, useState } from 'react'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Users, Search, Calendar, FileText } from 'lucide-react'
-
-interface Patient {
-  id: string
-  name: string
-  email: string
-  totalAppointments: number
-  lastVisit: string
-}
+import api from '@/lib/api'
+import { AdminPatient, AdminPatientsResponse } from '@/types/admin'
+import { toast } from '@/components/Toaster'
 
 export default function Patients() {
-  const { user } = useAuth()
-  const [patients, setPatients] = useState<Patient[]>([])
+  const [patients, setPatients] = useState<AdminPatient[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+
+  const limit = 24
 
   useEffect(() => {
-    loadPatients()
-  }, [user])
+    const timeout = setTimeout(() => {
+      setPage(1)
+      loadPatients(1, limit, searchQuery)
+    }, 400)
+    return () => clearTimeout(timeout)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery])
 
-  const loadPatients = async () => {
-    if (!user) return
+  useEffect(() => {
+    loadPatients(page, limit, searchQuery)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
 
+  const loadPatients = async (targetPage: number, targetLimit: number, search: string) => {
     try {
       setLoading(true)
-
-      // Get user ID
-      const { data: userData } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', user.email)
-        .single()
-
-      if (!userData) return
-
-      // Get all appointments for this dentist
-      const { data: appointments } = await supabase
-        .from('appointments')
-        .select(`
-          patient_id,
-          appointment_date,
-          profiles!appointments_patient_id_fkey(full_name, email)
-        `)
-        .eq('dentist_id', userData.id)
-        .order('appointment_date', { ascending: false })
-
-      // Group by patient
-      const patientMap = new Map<string, Patient>()
-
-      appointments?.forEach((apt) => {
-        const profile = apt.profiles as any
-        if (!profile) return
-
-        const patientId = apt.patient_id
-        if (patientMap.has(patientId)) {
-          const existing = patientMap.get(patientId)!
-          existing.totalAppointments++
-          // Update last visit if this is more recent
-          if (apt.appointment_date > existing.lastVisit) {
-            existing.lastVisit = apt.appointment_date
-          }
-        } else {
-          patientMap.set(patientId, {
-            id: patientId,
-            name: profile.full_name || 'Unknown',
-            email: profile.email || '',
-            totalAppointments: 1,
-            lastVisit: apt.appointment_date,
-          })
-        }
+      const response = await api.get<AdminPatientsResponse>('/admin/patients', {
+        params: {
+          page: targetPage,
+          limit: targetLimit,
+          search,
+        },
       })
 
-      setPatients(Array.from(patientMap.values()))
-    } catch (error) {
+      // Response structure: { success: true, data: [...], pagination: {...} }
+      const responseData = response as any
+      setPatients(responseData.data || [])
+      setTotal(responseData.pagination?.total || 0)
+    } catch (error: any) {
       console.error('Error loading patients:', error)
+      toast({
+        title: 'Failed to load patients',
+        description: error.message || 'Please try again later.',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredPatients = patients.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.email.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / limit)), [total])
 
   return (
     <DashboardLayout>
@@ -96,8 +65,8 @@ export default function Patients() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Patients</h1>
-            <p className="text-gray-500 mt-1">{patients.length} total patients</p>
+            <h1 className="text-3xl font-bold text-gray-900">Patients & Users</h1>
+            <p className="text-gray-500 mt-1">{total} total users</p>
           </div>
         </div>
 
@@ -119,16 +88,16 @@ export default function Patients() {
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
           </div>
-        ) : filteredPatients.length === 0 ? (
+        ) : patients.length === 0 ? (
           <Card className="p-12 border-0 shadow-lg text-center">
             <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">
-              {searchQuery ? 'No patients found matching your search' : 'No patients yet'}
+              {searchQuery ? 'No users found matching your search' : 'No records yet'}
             </p>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredPatients.map((patient) => (
+            {patients.map((patient) => (
               <Card
                 key={patient.id}
                 className="p-6 border-0 shadow-lg hover:shadow-xl transition-all cursor-pointer group"
@@ -147,7 +116,10 @@ export default function Patients() {
                       <div className="flex items-center gap-2 text-sm">
                         <Calendar className="w-4 h-4 text-gray-400" />
                         <span className="text-gray-600">
-                          Last visit: {new Date(patient.lastVisit).toLocaleDateString()}
+                          Last visit:{' '}
+                          {patient.lastAppointment
+                            ? new Date(patient.lastAppointment).toLocaleDateString()
+                            : '—'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
@@ -161,6 +133,30 @@ export default function Patients() {
                 </div>
               </Card>
             ))}
+          </div>
+        )}
+
+        {patients.length > 0 && (
+          <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+            <div className="space-x-2">
+              <button
+                className="px-4 py-2 rounded-md border border-gray-200 text-sm disabled:opacity-50"
+                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </button>
+              <button
+                className="px-4 py-2 rounded-md border border-gray-200 text-sm disabled:opacity-50"
+                onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={page === totalPages}
+              >
+                Next
+              </button>
+            </div>
+            <p className="text-sm text-gray-500">
+              Page {page} of {totalPages}
+            </p>
           </div>
         )}
       </div>

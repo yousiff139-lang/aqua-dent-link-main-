@@ -13,7 +13,7 @@ export interface AuthenticatedRequest extends Request {
 }
 
 // Appointment types
-export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type AppointmentStatus = 'pending' | 'confirmed' | 'upcoming' | 'completed' | 'cancelled';
 export type PaymentMethod = 'stripe' | 'cash';
 export type PaymentStatus = 'pending' | 'paid' | 'failed';
 
@@ -25,6 +25,7 @@ export interface Appointment {
   patient_phone: string;
   dentist_id: string;
   dentist_email: string;
+  dentist_name?: string;
   reason: string;
   appointment_date: Date;
   appointment_time: string;
@@ -33,10 +34,17 @@ export interface Appointment {
   payment_status: PaymentStatus;
   status: AppointmentStatus;
   notes?: string;
+  dentist_notes?: string;
   patient_notes?: string;
   medical_history?: string;
   stripe_session_id?: string;
   stripe_payment_intent_id?: string;
+  booking_reference?: string;
+  booking_source?: string;
+  documents?: any;
+  pdf_report_url?: string;
+  cancellation_reason?: string;
+  cancelled_at?: Date | null;
   created_at: Date;
   updated_at: Date;
 }

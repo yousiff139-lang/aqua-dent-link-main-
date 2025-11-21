@@ -1,3 +1,4 @@
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BookingService } from './bookingService';
 import { supabase } from '@/integrations/supabase/client';

@@ -1,0 +1,62 @@
+================================================================================
+I NEED TO SEE THE BROWSER CONSOLE
+================================================================================
+
+I can see the dentist portal shows "No appointments yet" but I need to see
+what the console says to know WHY.
+
+STEP 1: OPEN BROWSER CONSOLE
+-----------------------------
+1. In the dentist portal (http://localhost:5174)
+2. Press F12 (or right-click → Inspect)
+3. Click the "Console" tab
+4. Take a screenshot or copy the text
+
+STEP 2: LOOK FOR THESE MESSAGES
+--------------------------------
+👨‍⚕️ AppointmentsTab - Dentist: ...
+📧 AppointmentsTab - Dentist Email: ...
+🔍 Fetching appointments for dentist: ...
+Fetching appointments for dentist email: ...
+Found X appointments for ...
+✅ Fetched appointments: X appointments
+
+OR
+
+❌ No dentist email provided
+❌ Error fetching appointments
+
+STEP 3: RUN THIS SQL IN SUPABASE
+---------------------------------
+Go to Supabase → SQL Editor → New Query
+
+Paste this:
+
+SELECT 
+  dentist_email,
+  dentist_name,
+  COUNT(*) as appointment_count
+FROM public.appointments
+GROUP BY dentist_email, dentist_name;
+
+STEP 4: TELL ME
+---------------
+1. What does the console say?
+2. What does the SQL query return?
+3. What email are you logging in with in the dentist portal?
+
+MOST LIKELY ISSUE:
+------------------
+The email you're logging in with doesn't match the dentist_email
+in the appointments table.
+
+Example:
+- Login email: michael.chen@example.com
+- Appointment email: dr.chen@dentalcare.com
+- Result: No match = No appointments shown
+
+QUICK FIX:
+----------
+Once you tell me the emails, I can give you SQL to update them to match.
+
+================================================================================

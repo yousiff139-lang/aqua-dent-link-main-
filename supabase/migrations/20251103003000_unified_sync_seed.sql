@@ -30,3 +30,4 @@ ON CONFLICT (dentist_id, day_of_week) DO NOTHING;
 
 
 
+

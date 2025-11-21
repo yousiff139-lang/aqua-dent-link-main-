@@ -287,6 +287,28 @@ const MyAppointments = () => {
                         <p className="text-sm text-muted-foreground">{(appointment as any).notes}</p>
                       </div>
                     )}
+
+                    {/* Cancel Button */}
+                    {appointment.status !== 'cancelled' && appointment.status !== 'completed' && (
+                      <div className="mt-4 pt-4 border-t">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={async () => {
+                            if (window.confirm('Are you sure you want to cancel this appointment?')) {
+                              try {
+                                await appointmentService.cancelAppointment(appointment.id, 'Cancelled by patient');
+                                refetch();
+                              } catch (error: any) {
+                                alert(error.message || 'Failed to cancel appointment. Please try again.');
+                              }
+                            }
+                          }}
+                        >
+                          Cancel Appointment
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

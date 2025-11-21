@@ -81,3 +81,4 @@ CREATE POLICY "appointments_dentist_update_own" ON public.appointments
 
 
 
+

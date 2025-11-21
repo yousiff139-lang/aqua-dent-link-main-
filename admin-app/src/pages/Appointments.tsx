@@ -8,6 +8,8 @@ import { format, parseISO } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeAppointments } from '@/hooks/useRealtimeSync'
 import { useAuth } from '@/contexts/AuthContext'
+import api from '@/lib/api'
+import { toast } from '@/components/Toaster'
 
 interface Appointment {
   id: string
@@ -16,17 +18,16 @@ interface Appointment {
   patient_phone: string
   appointment_date: string
   appointment_time: string
-  symptoms: string
-  chief_complaint: string
+  symptoms?: string
+  chief_complaint?: string
+  reason?: string
   status: string
   payment_method: string
   payment_status: string
   pdf_report_url?: string
-  dentists: {
-    name: string
-    email: string
-    specialization: string
-  }
+  dentist_name?: string
+  dentist_email?: string
+  dentist_id?: string
 }
 
 export default function Appointments() {
@@ -70,39 +71,35 @@ export default function Appointments() {
     try {
       setLoading(true)
       
-      let query = supabase
-        .from('appointments')
-        .select(`
-          id,
-          patient_name,
-          patient_email,
-          patient_phone,
-          appointment_date,
-          appointment_time,
-          symptoms,
-          chief_complaint,
-          status,
-          payment_method,
-          payment_status,
-          pdf_report_url,
-          dentists!appointments_dentist_id_fkey (
-            name,
-            email,
-            specialization
-          )
-        `)
-        .order('appointment_date', { ascending: false })
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter)
+      const response = await api.get<{ success: boolean; data: Appointment[] }>('/admin/appointments')
+      // Response structure: { success: true, data: Appointment[] }
+      let appointments = (response as any).data || []
+      
+      if (!Array.isArray(appointments)) {
+        console.error('Invalid appointments data:', appointments)
+        appointments = []
       }
 
-      const { data, error } = await query
+      // Apply status filter on client side if needed
+      if (statusFilter !== 'all') {
+        appointments = appointments.filter(apt => apt.status === statusFilter)
+      }
 
-      if (error) throw error
-      setAppointments(data || [])
-    } catch (error) {
+      // Sort by appointment date descending
+      appointments.sort((a, b) => {
+        const dateA = new Date(a.appointment_date).getTime()
+        const dateB = new Date(b.appointment_date).getTime()
+        return dateB - dateA
+      })
+
+      setAppointments(appointments)
+    } catch (error: any) {
       console.error('Error loading appointments:', error)
+      toast({
+        title: 'Failed to load appointments',
+        description: error.message || 'Please try again later.',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
@@ -211,7 +208,10 @@ export default function Appointments() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-lg text-gray-900">{appointment.patient_name}</h3>
-                        <p className="text-sm text-gray-500">{appointment.dentists?.name} • {appointment.dentists?.specialization}</p>
+                        <p className="text-sm text-gray-500">
+                          {appointment.dentist_name || 'Unknown Dentist'}
+                          {appointment.dentist_email && ` • ${appointment.dentist_email}`}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -252,11 +252,11 @@ export default function Appointments() {
                     )}
                   </div>
 
-                  {(appointment.symptoms || appointment.chief_complaint) && (
+                  {(appointment.reason || appointment.symptoms || appointment.chief_complaint) && (
                     <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                       <p className="text-sm text-gray-700">
                         <span className="font-medium">Reason: </span>
-                        {appointment.chief_complaint || appointment.symptoms}
+                        {appointment.reason || appointment.chief_complaint || appointment.symptoms}
                       </p>
                     </div>
                   )}

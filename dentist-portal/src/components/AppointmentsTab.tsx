@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Calendar, Clock, User, CreditCard, Filter, CheckCircle, CalendarClock, Mail, Phone, LayoutGrid, Table, Download } from 'lucide-react';
+import { Calendar, Clock, User, CreditCard, Filter, CheckCircle, CalendarClock, Mail, Phone, LayoutGrid, Table, Download, X } from 'lucide-react';
 import { format, parseISO, isFuture } from 'date-fns';
 import { toast } from 'sonner';
 import { appointmentService } from '@/services/appointment.service';
@@ -23,8 +23,13 @@ const AppointmentsTab = () => {
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Debug logging
+  console.log('👨‍⚕️ AppointmentsTab - Dentist:', dentist);
+  console.log('📧 AppointmentsTab - Dentist Email:', dentist?.email);
   
   const { appointments, isLoading, error, refetch } = useAppointments(dentist?.email);
 
@@ -32,15 +37,15 @@ const AppointmentsTab = () => {
   useRealtimeAppointments(
     dentist?.id,
     {
-      onCreated: (newAppointment) => {
+      onCreated: () => {
         refetch(); // Refetch to get full appointment data with relations
         toast.success('🆕 New appointment received!');
       },
-      onUpdated: (updatedAppointment) => {
+      onUpdated: () => {
         refetch(); // Refetch to ensure data consistency
         toast.info('🔄 Appointment updated');
       },
-      onDeleted: (deletedId) => {
+      onDeleted: () => {
         refetch(); // Refetch to remove deleted appointment
         toast.warning('🗑️ Appointment cancelled');
       },
@@ -69,6 +74,7 @@ const AppointmentsTab = () => {
     const variants: Record<AppointmentStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
       pending: { variant: 'secondary', label: 'Pending' },
       confirmed: { variant: 'default', label: 'Confirmed' },
+      upcoming: { variant: 'default', label: 'Upcoming' },
       completed: { variant: 'outline', label: 'Completed' },
       cancelled: { variant: 'destructive', label: 'Cancelled' },
     };
@@ -136,7 +142,49 @@ const AppointmentsTab = () => {
       setSelectedAppointment(null);
       await refetch();
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to update appointment. Please try again.';
+      let errorMessage = err.message || 'Failed to update appointment. Please try again.';
+      
+      // Handle specific error cases
+      if (err.status === 401 || err.shouldRedirect) {
+        errorMessage = 'Your session has expired. Please log in again.';
+        toast.error(errorMessage, { id: loadingToast });
+        // Small delay before redirect to show the error message
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1500);
+        return;
+      }
+      
+      if (err.status === 403) {
+        errorMessage = 'You are not authorized to complete this appointment.';
+      }
+      
+      toast.error(errorMessage, { id: loadingToast });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle cancel appointment
+  const handleCancel = async (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setCancelDialogOpen(true);
+  };
+
+  const confirmCancel = async () => {
+    if (!selectedAppointment) return;
+
+    setIsProcessing(true);
+    const loadingToast = toast.loading('Cancelling appointment...');
+    
+    try {
+      await appointmentService.cancel(selectedAppointment.id);
+      toast.success('Appointment cancelled successfully', { id: loadingToast });
+      setCancelDialogOpen(false);
+      setSelectedAppointment(null);
+      await refetch();
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to cancel appointment. Please try again.';
       toast.error(errorMessage, { id: loadingToast });
     } finally {
       setIsProcessing(false);
@@ -229,11 +277,19 @@ const AppointmentsTab = () => {
 
   if (appointments.length === 0) {
     return (
-      <EmptyState
-        icon={Calendar}
-        title="No appointments yet"
-        description="Appointments will appear here once patients book with you. Make sure your profile is complete and visible to patients."
-      />
+      <div className="space-y-4">
+        <EmptyState
+          icon={Calendar}
+          title="No appointments yet"
+          description="Appointments will appear here once patients book with you. Make sure your profile is complete and visible to patients."
+        />
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm font-medium text-yellow-900 mb-2">🔍 Debug Info:</p>
+          <p className="text-xs text-yellow-800">Logged in as: {dentist?.full_name}</p>
+          <p className="text-xs text-yellow-800">Email: {dentist?.email}</p>
+          <p className="text-xs text-yellow-800 mt-2">Check browser console (F12) for detailed logs</p>
+        </div>
+      </div>
     );
   }
 
@@ -263,6 +319,13 @@ const AppointmentsTab = () => {
             onClick={() => setStatusFilter('confirmed')}
           >
             Confirmed ({appointments.filter((a) => a.status === 'confirmed').length})
+          </Button>
+          <Button
+            variant={statusFilter === 'upcoming' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setStatusFilter('upcoming')}
+          >
+            Upcoming ({appointments.filter((a) => a.status === 'upcoming').length})
           </Button>
           <Button
             variant={statusFilter === 'completed' ? 'default' : 'outline'}
@@ -327,6 +390,7 @@ const AppointmentsTab = () => {
                   appointment={appointment}
                   onMarkComplete={handleMarkComplete}
                   onReschedule={handleReschedule}
+                  onCancel={handleCancel}
                   onUpdateNotes={handleUpdateNotes}
                   isProcessing={isProcessing}
                 />
@@ -459,11 +523,23 @@ const AppointmentsTab = () => {
                                     Reschedule
                                   </Button>
                                 )}
-                                {appointment.pdf_report_url && (
+                                {canReschedule && (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => window.open(appointment.pdf_report_url, '_blank')}
+                                    onClick={() => handleCancel(appointment)}
+                                    className="whitespace-nowrap text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    title="Cancel appointment"
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Cancel
+                                  </Button>
+                                )}
+                                {(appointment as any).pdf_report_url && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => window.open((appointment as any).pdf_report_url, '_blank')}
                                     className="whitespace-nowrap"
                                     title="Download PDF Report"
                                   >
@@ -471,7 +547,7 @@ const AppointmentsTab = () => {
                                     PDF
                                   </Button>
                                 )}
-                                {!canMarkComplete && !canReschedule && !appointment.pdf_report_url && (
+                                {!canMarkComplete && !canReschedule && !(appointment as any).pdf_report_url && (
                                   <span className="text-sm text-muted-foreground">-</span>
                                 )}
                               </div>
@@ -506,6 +582,18 @@ const AppointmentsTab = () => {
         confirmLabel="Mark Complete"
         onConfirm={confirmMarkComplete}
         isLoading={isProcessing}
+      />
+
+      {/* Cancel Appointment Dialog */}
+      <ConfirmDialog
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        title="Cancel Appointment"
+        description={`Are you sure you want to cancel ${selectedAppointment?.patient_name}'s appointment? This action cannot be undone.`}
+        confirmLabel="Cancel Appointment"
+        onConfirm={confirmCancel}
+        isLoading={isProcessing}
+        variant="destructive"
       />
     </div>
   );
