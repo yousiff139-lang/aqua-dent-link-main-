@@ -59,46 +59,65 @@ const filterStatuses = (statuses?: string[]): string[] | undefined => {
 const findDentistByEmail = async (email: string) => {
   const normalizedEmail = normalizeEmail(email);
 
-  // First try dentists table
-  let { data, error } = await supabase
-    .from('dentists')
-    .select('*')
-    .ilike('email', normalizedEmail)
-    .maybeSingle();
-
-  // If not found in dentists table, try profiles table
-  if (!data && !error) {
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
+  try {
+    // First try dentists table
+    let { data, error } = await supabase
+      .from('dentists')
       .select('*')
-      .eq('email', normalizedEmail)
-      .eq('role', 'dentist')
+      .ilike('email', normalizedEmail)
       .maybeSingle();
 
-    if (profileError) {
-      logger.error('Failed to query dentist by email', { email: normalizedEmail, error: profileError });
-      throw AppError.internal('Failed to load dentist profile');
+    // If not found in dentists table, try profiles table
+    if (!data && !error) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', normalizedEmail)
+        .eq('role', 'dentist')
+        .maybeSingle();
+
+      if (profileError) {
+        logger.error('Failed to query dentist by email from profiles', { 
+          email: normalizedEmail, 
+          error: profileError,
+          errorMessage: profileError.message,
+          errorDetails: profileError.details,
+        });
+        // Don't throw immediately, try to continue
+      }
+
+      if (profileData) {
+        // Transform profile to dentist format
+        data = {
+          id: profileData.id,
+          email: profileData.email,
+          name: profileData.full_name || 'Unknown Dentist',
+          specialization: 'General Dentistry',
+          phone: profileData.phone,
+          status: 'active',
+          created_at: profileData.created_at,
+          updated_at: profileData.updated_at,
+        };
+      }
+    } else if (error) {
+      logger.error('Failed to query dentist by email from dentists table', { 
+        email: normalizedEmail, 
+        error,
+        errorMessage: error.message,
+        errorDetails: error.details,
+      });
+      // Continue to try profiles table
     }
 
-    if (profileData) {
-      // Transform profile to dentist format
-      data = {
-        id: profileData.id,
-        email: profileData.email,
-        name: profileData.full_name || 'Unknown Dentist',
-        specialization: 'General Dentistry',
-        phone: profileData.phone,
-        status: 'active',
-        created_at: profileData.created_at,
-        updated_at: profileData.updated_at,
-      };
-    }
-  } else if (error) {
-    logger.error('Failed to query dentist by email', { email: normalizedEmail, error });
+    return data;
+  } catch (error: any) {
+    logger.error('Unexpected error in findDentistByEmail', { 
+      email: normalizedEmail,
+      error: error.message,
+      stack: error.stack,
+    });
     throw AppError.internal('Failed to load dentist profile');
   }
-
-  return data;
 };
 
 const issueDentistToken = (dentist: ReturnType<typeof transformDentistRecord>) =>

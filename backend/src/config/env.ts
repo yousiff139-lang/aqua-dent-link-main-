@@ -14,7 +14,19 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 
-  CORS_ORIGIN: z.string().default('http://localhost:8000,http://localhost:3000,http://localhost:3001,http://localhost:5173'),
+  CORS_ORIGIN: z
+    .string()
+    .default(
+      [
+        'http://localhost:8000',   // user portal (vite or preview)
+        'http://localhost:3000',   // legacy user app / production preview
+        'http://localhost:3001',   // backend itself / health checks
+        'http://localhost:3010',   // admin portal dev server
+        'http://localhost:5173',   // vite default
+        'http://localhost:5174',   // dentist portal/dev variant
+        'http://localhost:8080',   // alt user portal port
+      ].join(',')
+    ),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
 
   REDIS_URL: z.string().optional(),
