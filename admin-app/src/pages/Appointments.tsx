@@ -70,29 +70,53 @@ export default function Appointments() {
   const loadAppointments = async () => {
     try {
       setLoading(true)
-      
-      const response = await api.get<{ success: boolean; data: Appointment[] }>('/admin/appointments')
-      // Response structure: { success: true, data: Appointment[] }
-      let appointments = (response as any).data || []
-      
-      if (!Array.isArray(appointments)) {
-        console.error('Invalid appointments data:', appointments)
-        appointments = []
+
+      let loaded: Appointment[] | null = null
+
+      // 1) Try backend API first
+      try {
+        const response = await api.get<{ success: boolean; data: Appointment[] }>('/admin/appointments')
+        const responseData = response as any
+        const apiAppointments = responseData?.data
+
+        if (Array.isArray(apiAppointments)) {
+          loaded = apiAppointments
+        }
+      } catch (apiError) {
+        console.warn('Backend /admin/appointments failed, falling back to Supabase:', apiError)
       }
+
+      // 2) Fallback: direct Supabase query if backend failed
+      if (!loaded) {
+        const { data, error } = await supabase
+          .from('appointments')
+          .select('*')
+          .order('appointment_date', { ascending: false })
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          console.error('Error loading appointments from Supabase:', error)
+          throw new Error(error.message || 'Failed to load appointments from database')
+        }
+
+        loaded = (data || []) as Appointment[]
+      }
+
+      let normalized = loaded
 
       // Apply status filter on client side if needed
       if (statusFilter !== 'all') {
-        appointments = appointments.filter(apt => apt.status === statusFilter)
+        normalized = normalized.filter(apt => apt.status === statusFilter)
       }
 
       // Sort by appointment date descending
-      appointments.sort((a, b) => {
+      normalized.sort((a, b) => {
         const dateA = new Date(a.appointment_date).getTime()
         const dateB = new Date(b.appointment_date).getTime()
         return dateB - dateA
       })
 
-      setAppointments(appointments)
+      setAppointments(normalized)
     } catch (error: any) {
       console.error('Error loading appointments:', error)
       toast({

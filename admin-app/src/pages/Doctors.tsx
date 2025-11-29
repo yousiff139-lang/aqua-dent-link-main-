@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Users, Search, Edit, Trash2, Plus, CalendarCheck, ClipboardList } from 'lucide-react'
 import { toast } from '@/components/Toaster'
 import api from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import { AdminDentist, AdminDentistsResponse, DeleteDentistResponse } from '@/types/admin'
 
 export default function Doctors() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchQuery, setSearchQuery] = useState('')
   const [doctors, setDoctors] = useState<AdminDentist[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -18,10 +20,52 @@ export default function Doctors() {
   const fetchDoctors = async () => {
     try {
       setIsLoading(true)
-      const response = await api.get<AdminDentistsResponse>('/admin/dentists')
-      // Response structure: { success: true, data: [...] }
-      const responseData = response as any
-      setDoctors(responseData.data || [])
+      let loaded = false
+
+      // 1) Try backend API first
+      try {
+        const response = await api.get<AdminDentistsResponse>('/admin/dentists')
+        const responseData = response as any
+        const backendDoctors = responseData?.data
+
+        if (Array.isArray(backendDoctors) && backendDoctors.length > 0) {
+          setDoctors(backendDoctors)
+          loaded = true
+        }
+      } catch (apiError) {
+        console.warn('Backend /admin/dentists failed, falling back to Supabase:', apiError)
+      }
+
+      // 2) Fallback: load directly from Supabase if backend failed or returned no dentists
+      if (!loaded) {
+        const { data, error } = await supabase
+          .from('dentists')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          console.error('Error loading dentists from Supabase:', error)
+          throw new Error(error.message || 'Failed to load dentists from database')
+        }
+
+        const dentists = (data || []).map((d: any): AdminDentist => ({
+          id: d.id,
+          name: d.name || 'Unknown Dentist',
+          email: d.email,
+          specialization: d.specialization || d.specialty || 'General Dentistry',
+          phone: d.phone || '',
+          status: d.status || 'active',
+          years_of_experience: d.years_of_experience ?? d.experience_years ?? 0,
+          education: d.education || '',
+          bio: d.bio || '',
+          image_url: d.image_url || d.profile_picture || null,
+          profile_picture: d.profile_picture || d.image_url || null,
+          totalAppointments: 0,
+          upcomingAppointments: 0,
+        }))
+
+        setDoctors(dentists)
+      }
     } catch (error: any) {
       console.error('Error fetching doctors:', error)
       toast({
@@ -37,6 +81,23 @@ export default function Doctors() {
   useEffect(() => {
     fetchDoctors()
   }, [])
+
+  // Refresh doctors list when navigated from AddDoctor page
+  useEffect(() => {
+    if (location.state?.refresh) {
+      fetchDoctors()
+      // Clear the state to prevent unnecessary refreshes
+      navigate(location.pathname, { replace: true, state: {} })
+      
+      // Show success message if new dentist was created
+      if (location.state?.newDentist) {
+        toast({
+          title: 'Dentist added successfully',
+          description: `${location.state.newDentist.name} has been added to the system.`,
+        })
+      }
+    }
+  }, [location.state])
 
   const handleDeleteClick = (doctor: AdminDentist) => {
     if (window.confirm(`Are you sure you want to delete ${doctor.name}? This will remove them from the system and they will no longer appear in the user portal or chatbot suggestions. This action cannot be undone.`)) {

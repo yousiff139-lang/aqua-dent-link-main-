@@ -4,8 +4,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { BookingForm } from "@/components/BookingForm";
+import { EnhancedBookingForm } from "@/components/EnhancedBookingForm";
 import { BookingConfirmation } from "@/components/BookingConfirmation";
+import { DentistReviews } from "@/components/DentistReviews";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useDentist } from "@/hooks/useDentist";
@@ -23,13 +24,13 @@ const DentistProfile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const bookingFormRef = useRef<HTMLDivElement>(null);
-  
+
   // Track page load performance
   usePerformanceTracking('DentistProfile');
-  
+
   // Fetch dentist data from database
   const { data: dentist, isLoading, error } = useDentist(id);
-  
+
   // State for booking confirmation
   const [bookingSuccess, setBookingSuccess] = useState<{
     appointmentId: string;
@@ -99,12 +100,12 @@ const DentistProfile = () => {
   }
 
   // Parse education from string to array if needed
-  const educationArray = dentist.education 
-    ? (typeof dentist.education === 'string' 
-        ? dentist.education.split('\n').filter(e => e.trim()) 
-        : Array.isArray(dentist.education) 
-          ? dentist.education 
-          : [dentist.education])
+  const educationArray = dentist.education
+    ? (typeof dentist.education === 'string'
+      ? dentist.education.split('\n').filter(e => e.trim())
+      : Array.isArray(dentist.education)
+        ? dentist.education
+        : [dentist.education])
     : [];
 
   // Parse expertise array
@@ -112,7 +113,7 @@ const DentistProfile = () => {
 
   // Handle image URL with placeholder fallback
   const dentistImage = dentist.image_url || PLACEHOLDER_IMAGE;
-  
+
   // Handle image load errors
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     console.warn('Failed to load dentist image, using placeholder:', dentist.image_url);
@@ -121,9 +122,9 @@ const DentistProfile = () => {
 
   // Smooth scroll to booking form
   const scrollToBookingForm = () => {
-    bookingFormRef.current?.scrollIntoView({ 
-      behavior: "smooth", 
-      block: "start" 
+    bookingFormRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
     });
   };
 
@@ -136,27 +137,25 @@ const DentistProfile = () => {
     paymentStatus: "pending" | "paid";
   }) => {
     setBookingSuccess(data);
-    
+
     // Scroll to top to show confirmation
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  // Chatbot functionality removed - will be reimplemented
 
   return (
     <div className="min-h-screen">
       <Navbar />
       <section className="pt-28 pb-12 container mx-auto px-4">
         <div className="grid md:grid-cols-2 gap-8">
-          <Card className="overflow-hidden aspect-square">
-            <img 
-              src={dentistImage} 
-              alt={dentist.name} 
-              className="w-full h-full object-cover" 
+          <Card className="overflow-hidden aspect-square hover:shadow-lg transition-shadow duration-300 animate-fade-in">
+            <img
+              src={dentistImage}
+              alt={dentist.name}
+              className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
               onError={handleImageError}
             />
           </Card>
-          <div>
+          <div className="animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
             <h1 className="text-4xl font-bold mb-2">{dentist.name}</h1>
             <p className="text-primary font-medium mb-4">{dentist.specialization || "General Dentistry"}</p>
             <div className="flex items-center gap-2 mb-4">
@@ -170,6 +169,26 @@ const DentistProfile = () => {
               </span>
             </div>
             <p className="text-muted-foreground mb-6">{dentist.bio || "Experienced dental professional dedicated to providing quality care."}</p>
+            
+            {/* Contact Information */}
+            <div className="mb-6 space-y-2">
+              {dentist.email && (
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium">Email:</span> {dentist.email}
+                </p>
+              )}
+              {(dentist.phone || (dentist as any).phone) && (
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium">Phone:</span> {(dentist.phone || (dentist as any).phone)}
+                </p>
+              )}
+              {(dentist.years_of_experience || dentist.experience_years) && (
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium">Experience:</span> {dentist.years_of_experience || dentist.experience_years} years
+                </p>
+              )}
+            </div>
+            
             <div className="grid md:grid-cols-2 gap-6 mb-6">
               {educationArray.length > 0 && (
                 <Card className="p-4">
@@ -189,7 +208,7 @@ const DentistProfile = () => {
               )}
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button 
+              <Button
                 className="gradient-primary text-primary-foreground flex-1 sm:flex-none"
                 onClick={scrollToBookingForm}
                 size="lg"
@@ -209,20 +228,19 @@ const DentistProfile = () => {
           <DentistAvailabilityDisplay dentistId={dentist.id} />
         </div>
 
-        {/* Reviews section - placeholder for future implementation */}
+        {/* Reviews section with virtual comments and animations */}
         <div className="mt-10">
-          <h2 className="text-2xl font-bold mb-4">Patient Reviews</h2>
-          <Card className="p-6 text-center">
-            <p className="text-muted-foreground">
-              Patient reviews will be available soon. Book an appointment to be one of the first to leave a review!
-            </p>
-          </Card>
+          <DentistReviews 
+            dentistName={dentist.name}
+            averageRating={dentist.rating || 4.9}
+            totalReviews={dentist.reviews || 24}
+          />
         </div>
 
         {/* Booking Section */}
         <div ref={bookingFormRef} className="mt-16 scroll-mt-24">
           <h2 className="text-2xl font-bold mb-6 text-center">Book Your Appointment</h2>
-          
+
           {bookingSuccess ? (
             <BookingConfirmation
               appointmentId={bookingSuccess.appointmentId}
@@ -233,7 +251,7 @@ const DentistProfile = () => {
               paymentStatus={bookingSuccess.paymentStatus}
             />
           ) : (
-            <BookingForm
+            <EnhancedBookingForm
               dentistId={dentist.id}
               dentistName={dentist.name}
               dentistEmail={dentist.email}
@@ -243,8 +261,6 @@ const DentistProfile = () => {
         </div>
       </section>
       <Footer />
-
-      {/* Chatbot will be added here */}
     </div>
   );
 };

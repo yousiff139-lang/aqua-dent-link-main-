@@ -19,6 +19,8 @@ export const supabase = createClient(
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+      // Ensure we're using admin API
+      detectSessionInUrl: false,
     },
     db: {
       schema: 'public',
@@ -26,6 +28,7 @@ export const supabase = createClient(
     global: {
       headers: {
         'x-application-name': 'realtime-sync-backend',
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
       },
     },
   }
@@ -43,6 +46,30 @@ export const testSupabaseConnection = async (): Promise<boolean> => {
     return true;
   } catch (error: any) {
     logger.error('Supabase connection test error', { 
+      error: error.message,
+      stack: error.stack,
+    });
+    return false;
+  }
+};
+
+// Test if service role key has admin permissions
+export const testAdminPermissions = async (): Promise<boolean> => {
+  try {
+    // Try to list users (requires admin permissions)
+    const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1 });
+    if (error) {
+      logger.error('Service role key does not have admin permissions', { 
+        error: error.message,
+        code: error.code,
+        status: error.status 
+      });
+      return false;
+    }
+    logger.info('✅ Service role key has admin permissions');
+    return true;
+  } catch (error: any) {
+    logger.error('Admin permissions test error', { 
       error: error.message,
       stack: error.stack,
     });

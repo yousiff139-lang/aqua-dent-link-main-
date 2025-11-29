@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -51,7 +51,13 @@ const enhancedBookingFormSchema = z.object({
     .min(10, { message: "Phone number must be at least 10 digits." })
     .max(20, { message: "Phone number must not exceed 20 characters." })
     .regex(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/, { message: "Please enter a valid phone number." }),
-  
+
+  // Gender and Pregnancy
+  gender: z.enum(["male", "female"], {
+    required_error: "Please select your gender.",
+  }),
+  isPregnant: z.boolean().default(false).optional(),
+
   // Appointment Details
   date: z.date({
     required_error: "Please select an appointment date.",
@@ -60,7 +66,7 @@ const enhancedBookingFormSchema = z.object({
   time: z.string({
     required_error: "Please select an appointment time.",
   }).min(1, { message: "Please select an appointment time." }),
-  
+
   // Medical Information
   chiefComplaint: z.string()
     .min(10, { message: "Please provide more details about your visit (at least 10 characters)." })
@@ -68,14 +74,17 @@ const enhancedBookingFormSchema = z.object({
   symptoms: z.string()
     .min(10, { message: "Please describe your symptoms (at least 10 characters)." })
     .max(1000, { message: "Symptoms must not exceed 1000 characters." }),
-  
+
+  // Chronic Diseases (Important)
+  chronicDiseases: z.string().optional(),
+
   // Medical History
   smoking: z.boolean().default(false),
   medications: z.string().optional(),
   allergies: z.string().optional(),
   previousDentalWork: z.string().optional(),
   medicalHistory: z.string().optional(),
-  
+
   // Payment
   paymentMethod: z.enum(["stripe", "cash"], {
     required_error: "Please select how you would like to pay.",
@@ -125,6 +134,8 @@ export function EnhancedBookingForm({
 }: EnhancedBookingFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<{ value: string; label: string }[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isMedicalHistoryOpen, setIsMedicalHistoryOpen] = useState(false);
   const { toast } = useToast();
@@ -138,8 +149,11 @@ export function EnhancedBookingForm({
       patientName: "",
       patientEmail: "",
       phone: "",
+      gender: undefined,
+      isPregnant: false,
       chiefComplaint: "",
       symptoms: "",
+      chronicDiseases: "",
       smoking: false,
       medications: "",
       allergies: "",
@@ -149,6 +163,88 @@ export function EnhancedBookingForm({
       paymentMethod: "cash",
     },
   });
+
+  // Fetch dentist's availability when date is selected
+  useEffect(() => {
+    if (!selectedDate) {
+      setAvailableTimeSlots([]);
+      return;
+    }
+
+    const fetchAvailability = async () => {
+      try {
+        const dayOfWeek = selectedDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+        const { data, error } = await supabase
+          .from('dentist_availability')
+          .select('*')
+          .eq('dentist_id', dentistId)
+          .eq('day_of_week', dayOfWeek)
+          .eq('is_available', true);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          // No availability set for this day
+          setAvailableTimeSlots([]);
+          toast({
+            title: "No Availability",
+            description: `${dentistName} is not available on this day. Please select another date.`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Generate time slots based on dentist's availability
+        const slots: { value: string; label: string }[] = [];
+
+        data.forEach((availability: any) => {
+          const startTime = availability.start_time; // e.g., "12:00:00"
+          const endTime = availability.end_time; // e.g., "16:00:00"
+          const slotDuration = availability.slot_duration_minutes || 30;
+
+          // Parse start and end times
+          const [startHour, startMin] = startTime.split(':').map(Number);
+          const [endHour, endMin] = endTime.split(':').map(Number);
+
+          let currentHour = startHour;
+          let currentMin = startMin;
+
+          while (
+            currentHour < endHour ||
+            (currentHour === endHour && currentMin < endMin)
+          ) {
+            const timeValue = `${currentHour.toString().padStart(2, '0')}:${currentMin.toString().padStart(2, '0')}`;
+            const displayTime = new Date(`2000-01-01T${timeValue}`).toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            });
+
+            slots.push({ value: timeValue, label: displayTime });
+
+            // Increment by slot duration
+            currentMin += slotDuration;
+            if (currentMin >= 60) {
+              currentHour += Math.floor(currentMin / 60);
+              currentMin = currentMin % 60;
+            }
+          }
+        });
+
+        setAvailableTimeSlots(slots);
+      } catch (err) {
+        console.error('Error fetching availability:', err);
+        toast({
+          title: "Error",
+          description: "Failed to load available time slots. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchAvailability();
+  }, [selectedDate, dentistId, dentistName, toast]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -182,7 +278,7 @@ export function EnhancedBookingForm({
       try {
         const fileExt = file.name.split('.').pop();
         const fileName = `${appointmentId}/${crypto.randomUUID()}.${fileExt}`;
-        
+
         const { data, error } = await supabase.storage
           .from('medical-documents')
           .upload(fileName, file);
@@ -242,12 +338,16 @@ export function EnhancedBookingForm({
           patient_name: data.patientName,
           patient_email: data.patientEmail,
           patient_phone: data.phone,
+          gender: data.gender,
+          is_pregnant: data.isPregnant || false,
           dentist_id: dentistId,
+          dentist_name: dentistName,
           dentist_email: dentistEmail,
           appointment_date: format(data.date, "yyyy-MM-dd"),
           appointment_time: data.time,
           chief_complaint: data.chiefComplaint,
           symptoms: data.symptoms,
+          chronic_diseases: data.chronicDiseases,
           medical_history: data.medicalHistory,
           smoking: data.smoking,
           medications: data.medications,
@@ -322,15 +422,15 @@ export function EnhancedBookingForm({
           const stripeErrorMessage = stripeErr instanceof Error
             ? stripeErr.message
             : "Payment initialization failed. Please try again.";
-          
+
           setError(stripeErrorMessage);
-          
+
           toast({
             title: "Payment Error",
             description: stripeErrorMessage,
             variant: "destructive",
           });
-          
+
           setIsSubmitting(false);
           return;
         }
@@ -357,13 +457,13 @@ export function EnhancedBookingForm({
       }
     } catch (err: any) {
       let errorMessage = "Failed to book appointment. Please try again.";
-      
+
       if (err instanceof Error) {
         errorMessage = err.message;
       }
-      
+
       setError(errorMessage);
-      
+
       toast({
         title: "Booking Failed",
         description: errorMessage,
@@ -428,12 +528,58 @@ export function EnhancedBookingForm({
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gender</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
+
+            {/* Pregnancy field - only show if female */}
+            {form.watch("gender") === "female" && (
+              <FormField
+                control={form.control}
+                name="isPregnant"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Are you currently pregnant?</FormLabel>
+                      <FormDescription>
+                        This information is important for your dental treatment
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Medical Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Medical Information</h3>
-              
+
               <FormField
                 control={form.control}
                 name="chiefComplaint"
@@ -470,6 +616,30 @@ export function EnhancedBookingForm({
                     </FormControl>
                     <FormDescription>
                       Provide detailed information about your symptoms
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="chronicDiseases"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-red-600 font-semibold">
+                      Chronic Diseases / Conditions (Important) *
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="E.g., Diabetes, High blood pressure, Heart disease, etc."
+                        className="min-h-[80px] border-red-200"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Please list any chronic conditions (diabetes, blood pressure, heart disease, etc.).
+                      This information is crucial for your dental treatment. Type "None" if you don't have any.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -668,7 +838,10 @@ export function EnhancedBookingForm({
                         <Calendar
                           mode="single"
                           selected={field.value}
-                          onSelect={field.onChange}
+                          onSelect={(date) => {
+                            field.onChange(date);
+                            setSelectedDate(date);
+                          }}
                           disabled={(date) =>
                             date < new Date(new Date().setHours(0, 0, 0, 0))
                           }
@@ -694,11 +867,17 @@ export function EnhancedBookingForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {timeSlots.map((slot) => (
-                          <SelectItem key={slot.value} value={slot.value}>
-                            {slot.label}
+                        {availableTimeSlots.length > 0 ? (
+                          availableTimeSlots.map((slot) => (
+                            <SelectItem key={slot.value} value={slot.value}>
+                              {slot.label}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-slots-available" disabled>
+                            {selectedDate ? 'No available times' : 'Select a date first'}
                           </SelectItem>
-                        ))}
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />

@@ -44,9 +44,11 @@ async function request<T = any>(path: string, options?: RequestOptions): Promise
 
     if (!response.ok) {
       let message = 'Request failed';
+      let errorDetails: any = null;
       try {
         const errorBody = await response.json();
         message = errorBody?.error?.message || errorBody?.message || message;
+        errorDetails = errorBody?.error?.details || errorBody?.details;
       } catch {
         try {
           message = await response.text();
@@ -59,7 +61,9 @@ async function request<T = any>(path: string, options?: RequestOptions): Promise
           }
         }
       }
-      throw new Error(message);
+      const error = new Error(message) as any;
+      error.response = { data: { error: { message, details: errorDetails } } };
+      throw error;
     }
 
     if (responseType === 'blob') {

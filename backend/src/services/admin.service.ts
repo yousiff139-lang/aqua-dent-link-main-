@@ -13,6 +13,13 @@ const createDentistSchema = z.object({
   years_of_experience: z.number().int().nonnegative().optional(),
   bio: z.string().optional(),
   education: z.string().optional(),
+  availability: z.array(z.object({
+    day_of_week: z.number().int().min(0).max(6),
+    start_time: z.string().regex(/^\d{2}:\d{2}$/),
+    end_time: z.string().regex(/^\d{2}:\d{2}$/),
+    slot_duration_minutes: z.number().int().min(5).max(240),
+    is_available: z.boolean(),
+  })).optional(),
 });
 
 interface PatientQueryParams {
@@ -28,8 +35,11 @@ const sanitizePagination = (page?: number, limit?: number) => {
 };
 
 const generateTempPassword = (): string => {
-  const random = crypto.randomBytes(4).toString('hex');
-  return `Dentist-${random}`;
+  // Generate a secure password that meets Supabase requirements (min 6 chars)
+  // Format: Dentist-XXXX-YYYY where XXXX and YYYY are random hex strings
+  const part1 = crypto.randomBytes(2).toString('hex');
+  const part2 = crypto.randomBytes(2).toString('hex');
+  return `Dentist-${part1}-${part2}`;
 };
 
 const buildSearchFilter = (term?: string) => {
@@ -71,7 +81,7 @@ export class AdminService {
               .select('id, full_name, email')
               .eq('email', apt.dentist_email)
               .single();
-            
+
             if (profile) {
               apt.dentist_name = profile.full_name;
               apt.dentist_email = profile.email;
@@ -97,43 +107,11 @@ export class AdminService {
     const { page, limit, from, to } = sanitizePagination(params.page, params.limit);
 
     try {
-      // First, get all dentist IDs to exclude them
-      const { data: dentists } = await supabase
-        .from('dentists')
-        .select('id');
-      
-      const dentistIds = (dentists || []).map(d => d.id).filter(Boolean);
-
-      // Get all admin IDs to exclude them
-      const { data: admins } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'admin');
-      
-      const adminIds = (admins || []).map(a => a.user_id).filter(Boolean);
-
-      // Also get dentists from user_roles
-      const { data: dentistRoles } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'dentist');
-      
-      const dentistRoleIds = (dentistRoles || []).map(a => a.user_id).filter(Boolean);
-
-      // Combine IDs to exclude (dentists and admins)
-      const excludeIds = [...new Set([...dentistIds, ...adminIds, ...dentistRoleIds])];
-
       // Build query for profiles that are NOT dentists or admins
       let query = supabase
         .from('profiles')
-        .select('id, full_name, email, phone, created_at', { count: 'exact' });
-
-      // Exclude dentists and admins - Supabase PostgREST syntax
-      if (excludeIds.length > 0) {
-        // Use not.in filter - format: (id1,id2,id3)
-        const excludeList = excludeIds.join(',');
-        query = query.not('id', 'in', `(${excludeList})`);
-      }
+        .select('id, full_name, email, phone, created_at', { count: 'exact' })
+        .not('role', 'in', '("dentist","admin")');
 
       // Apply search filter if provided
       const searchFilter = buildSearchFilter(params.search);
@@ -217,7 +195,7 @@ export class AdminService {
       const { data: dentists, error: dentistsError } = await supabase
         .from('dentists')
         .select(
-          'id, name, email, specialization, phone, status, years_of_experience, experience_years, education, bio, profile_picture, image_url, created_at, updated_at'
+          'id, name, email, specialization, phone, status, years_of_experience, education, bio, image_url, created_at, updated_at'
         )
         .order('created_at', { ascending: false });
 
@@ -240,6 +218,13 @@ export class AdminService {
             specialization: 'General Dentistry',
             status: 'active',
             created_at: p.created_at,
+            years_of_experience: 0,
+            experience_years: 0,
+            education: null,
+            bio: null,
+            profile_picture: null,
+            image_url: null,
+            updated_at: p.created_at
           }));
         }
       }
@@ -293,11 +278,11 @@ export class AdminService {
           specialization: dentist.specialization || dentist.specialty || 'General Dentistry',
           phone: dentist.phone,
           status: dentist.status || 'active',
-          years_of_experience: dentist.years_of_experience || dentist.experience_years,
+          years_of_experience: dentist.years_of_experience,
           education: dentist.education,
           bio: dentist.bio,
-          profile_picture: dentist.profile_picture || dentist.image_url,
-          image_url: dentist.image_url || dentist.profile_picture,
+          image_url: dentist.image_url,
+          profile_picture: dentist.image_url, // Keep for compatibility if needed by frontend types
           totalAppointments: stats.total,
           upcomingAppointments: stats.upcoming,
         };
@@ -312,129 +297,264 @@ export class AdminService {
 
   async createDentist(rawInput: unknown) {
     const payload = createDentistSchema.parse(rawInput);
-    const normalizedEmail = payload.email.toLowerCase();
 
-    const { data: existingDentist, error: existingError } = await supabase
-      .from('dentists')
-      .select('id')
-      .ilike('email', normalizedEmail)
-      .maybeSingle();
-
-    if (existingError) {
-      logger.error('Failed to check existing dentists', { existingError });
-      throw AppError.internal('Failed to create dentist');
-    }
-
-    if (existingDentist) {
-      throw AppError.conflict('A dentist with this email already exists');
-    }
-
+    // Generate a temporary password
     const tempPassword = generateTempPassword();
 
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email: normalizedEmail,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: {
-        role: 'dentist',
-        full_name: payload.name,
-      },
-    });
+    try {
+      // Validate email format
+      if (!payload.email || !payload.email.includes('@')) {
+        throw AppError.validation('Invalid email address');
+      }
 
-    if (authError || !authData?.user) {
-      logger.error('Failed to create dentist auth user', { authError });
-      throw AppError.internal('Failed to create dentist user');
-    }
+      // Validate password requirements (Supabase requires min 6 characters)
+      if (tempPassword.length < 6) {
+        logger.error('Generated password too short', { length: tempPassword.length });
+        throw AppError.internal('Password generation failed');
+      }
 
-    const userId = authData.user.id;
+      logger.info('Creating auth user', { email: payload.email, name: payload.name });
 
-    const profileInsert = supabase.from('profiles').upsert({
-      id: userId,
-      full_name: payload.name,
-      email: normalizedEmail,
-      phone: payload.phone || null,
-    });
-
-    const dentistInsert = supabase.from('dentists').upsert({
-      id: userId,
-      name: payload.name,
-      email: normalizedEmail,
-      specialization: payload.specialization,
-      phone: payload.phone || null,
-      years_of_experience: payload.years_of_experience ?? null,
-      experience_years: payload.years_of_experience ?? null,
-      bio: payload.bio || null,
-      education: payload.education || null,
-      status: 'active',
-    });
-
-    const roleInsert = supabase.from('user_roles').upsert({
-      user_id: userId,
-      role: 'dentist',
-      dentist_id: userId,
-    });
-
-    const [profileResult, dentistResult, roleResult] = await Promise.all([profileInsert, dentistInsert, roleInsert]);
-
-    if (profileResult.error || dentistResult.error || roleResult.error) {
-      logger.error('Failed to finalize dentist creation', {
-        profileError: profileResult.error,
-        dentistError: dentistResult.error,
-        roleError: roleResult.error,
+      // 1. Create the user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: payload.email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: payload.name,
+          role: 'dentist'
+        }
       });
-      await supabase.auth.admin.deleteUser(userId);
-      throw AppError.internal('Failed to create dentist');
-    }
 
-    return {
-      dentist: {
-        id: userId,
-        ...dentistResult.data?.[0],
-      },
-      tempPassword,
-    };
+      if (authError) {
+        logger.error('Failed to create auth user', { 
+          error: authError,
+          message: authError.message,
+          status: authError.status,
+          code: authError.code,
+          email: payload.email
+        });
+        
+        // Handle specific error cases
+        if (authError.message?.includes('already registered') || 
+            authError.message?.includes('already exists') ||
+            authError.message?.includes('User already registered')) {
+          throw AppError.conflict('Email already registered. Please use a different email address.');
+        }
+        
+        if (authError.message?.includes('Invalid email')) {
+          throw AppError.validation('Invalid email address format');
+        }
+        
+        if (authError.message?.includes('Password')) {
+          throw AppError.validation('Password does not meet requirements');
+        }
+
+        // Check if it's a service role key issue
+        if (authError.message?.includes('JWT') || authError.message?.includes('token') || authError.status === 401) {
+          logger.error('Possible service role key issue', { error: authError });
+          throw AppError.internal('Authentication configuration error. Please check backend service role key.');
+        }
+
+        // Generic error with more details
+        const errorDetails = authError.message || authError.code || 'Unknown error';
+        throw AppError.internal(`Failed to create dentist account: ${errorDetails}`);
+      }
+
+      if (!authData.user) {
+        throw AppError.internal('Failed to create dentist account: No user returned');
+      }
+
+      const userId = authData.user.id;
+
+      // 2. Update Profile (trigger already created it, we just need to set role and other fields)
+      //    Give the trigger a moment to complete, then check if profile exists
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // First check if profile exists, if not create it
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        logger.error('Failed to check profile existence', { error: checkError });
+        await supabase.auth.admin.deleteUser(userId);
+        throw AppError.internal(`Failed to check profile: ${checkError.message}`);
+      }
+
+      let profileError;
+      if (!existingProfile) {
+        // Profile doesn't exist, create it
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            full_name: payload.name,
+            email: payload.email,
+            phone: payload.phone || null,
+            role: 'dentist',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        profileError = insertError;
+      } else {
+        // Profile exists, update it
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            full_name: payload.name,
+            email: payload.email,
+            phone: payload.phone || null,
+            role: 'dentist',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+        profileError = updateError;
+      }
+
+      if (profileError) {
+        logger.error('Failed to create/update profile', { error: profileError, userId });
+        // Try to clean up auth user
+        try {
+          await supabase.auth.admin.deleteUser(userId);
+        } catch (cleanupError) {
+          logger.error('Failed to cleanup auth user after profile error', { cleanupError });
+        }
+        throw AppError.internal(`Failed to create dentist profile: ${profileError.message || profileError.code || 'Unknown error'}`);
+      }
+
+      // 3. Create/Update Dentist Record
+      const { error: dentistError } = await supabase
+        .from('dentists')
+        .upsert({
+          id: userId,
+          name: payload.name,
+          email: payload.email,
+          specialization: payload.specialization,
+          phone: payload.phone || null,
+          years_of_experience: payload.years_of_experience || 0,
+          bio: payload.bio || null,
+          education: payload.education || null,
+          status: 'active',
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id'
+        });
+
+      if (dentistError) {
+        logger.error('Failed to create dentist record', { error: dentistError, userId });
+        // Try to clean up auth user and profile
+        try {
+          await supabase.auth.admin.deleteUser(userId);
+          await supabase.from('profiles').delete().eq('id', userId);
+        } catch (cleanupError) {
+          logger.error('Failed to cleanup after dentist record error', { cleanupError });
+        }
+        throw AppError.internal(`Failed to create dentist details: ${dentistError.message || dentistError.code || 'Unknown error'}`);
+      }
+
+      // 4. Assign Role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert({
+          user_id: userId,
+          role: 'dentist',
+          dentist_id: userId
+        }, { onConflict: 'user_id, role' });
+
+      if (roleError) {
+        logger.error('Failed to assign role', { error: roleError });
+        // Continue anyway as profile has role
+      }
+
+      // 5. Create availability records if provided
+      if (payload.availability && payload.availability.length > 0) {
+        // Validate time ranges
+        for (const avail of payload.availability) {
+          if (avail.start_time >= avail.end_time) {
+            logger.warn('Invalid time range for availability', { avail });
+            throw AppError.validation(`Invalid time range for day ${avail.day_of_week}: start time must be before end time`);
+          }
+        }
+
+        const availabilityRecords = payload.availability.map((avail) => ({
+          dentist_id: userId,
+          day_of_week: avail.day_of_week,
+          start_time: avail.start_time,
+          end_time: avail.end_time,
+          slot_duration_minutes: avail.slot_duration_minutes,
+          is_available: avail.is_available,
+        }));
+
+        const { error: availabilityError } = await supabase
+          .from('dentist_availability')
+          .insert(availabilityRecords);
+
+        if (availabilityError) {
+          logger.error('Failed to create availability records', { error: availabilityError });
+          // Don't throw - dentist is created, they can add availability later
+          logger.warn('Dentist created but availability not saved', { dentistId: userId });
+        } else {
+          logger.info('Availability records created successfully', { dentistId: userId, count: availabilityRecords.length });
+        }
+      }
+
+      return {
+        dentist: {
+          id: userId,
+          name: payload.name,
+          email: payload.email,
+          expertise: [payload.specialization],
+          status: 'active',
+        },
+        tempPassword,
+      };
+
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error('Unexpected error creating dentist', { error });
+      throw AppError.internal('An unexpected error occurred while creating the dentist');
+    }
   }
 
   async deleteDentist(dentistId: string) {
-    const { data: dentist, error } = await supabase
-      .from('dentists')
-      .select('id, email, name')
-      .eq('id', dentistId)
-      .single();
-
-    if (error) {
-      logger.error('Failed to load dentist before delete', { error });
-      throw AppError.notFound('Dentist not found');
-    }
-
-    const deleteDentist = supabase.from('dentists').delete().eq('id', dentistId);
-    const deleteRoles = supabase.from('user_roles').delete().eq('user_id', dentistId);
-    const deleteProfile = supabase.from('profiles').delete().eq('id', dentistId);
-
-    const [dentistDeleteResult, roleDeleteResult, profileDeleteResult] = await Promise.all([
-      deleteDentist,
-      deleteRoles,
-      deleteProfile,
-    ]);
-
-    if (dentistDeleteResult.error || roleDeleteResult.error || profileDeleteResult.error) {
-      logger.error('Failed to delete dentist records', {
-        dentistError: dentistDeleteResult.error,
-        roleError: roleDeleteResult.error,
-        profileError: profileDeleteResult.error,
-      });
-      throw AppError.internal('Failed to delete dentist');
-    }
-
     try {
-      await supabase.auth.admin.deleteUser(dentistId);
-    } catch (authError) {
-      logger.warn('Failed to delete dentist auth user (already removed?)', { authError, dentistId });
-    }
+      // 1. Delete from Dentists
+      const { error: dentistError } = await supabase
+        .from('dentists')
+        .delete()
+        .eq('id', dentistId);
 
-    return {
-      message: `Dentist ${dentist.name || dentist.email} removed successfully`,
-    };
+      if (dentistError) {
+        logger.error('Failed to delete dentist record', { error: dentistError });
+        throw AppError.internal('Failed to delete dentist');
+      }
+
+      // 2. Delete from Profiles
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', dentistId);
+
+      if (profileError) {
+        logger.warn('Failed to delete profile', { error: profileError });
+      }
+
+      // 3. Delete Auth User
+      const { error: authError } = await supabase.auth.admin.deleteUser(dentistId);
+      if (authError) {
+        logger.error('Failed to delete auth user', { error: authError });
+        // Don't throw here if DB deletion worked, as it might be already deleted or not found
+      }
+
+      return { message: 'Dentist deleted successfully' };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error('Unexpected error deleting dentist', { error });
+      throw AppError.internal('An unexpected error occurred while deleting the dentist');
+    }
   }
 
   async getAnalytics() {
@@ -523,9 +643,9 @@ export class AdminService {
 
     const { data: topDentistsData } = topDentistIds.length
       ? await supabase
-          .from('dentists')
-          .select('id, name, email, specialization')
-          .in('id', topDentistIds)
+        .from('dentists')
+        .select('id, name, email, specialization')
+        .in('id', topDentistIds)
       : { data: [] };
 
     const topDentists = (topDentistsData || []).map((dentist) => ({
@@ -603,52 +723,44 @@ export class AdminService {
         .from('user_roles')
         .select('user_id')
         .eq('role', 'admin');
+
       const adminIds = (admins || []).map(a => a.user_id).filter(Boolean);
+      const excludeIds = [...new Set([...dentistIds, ...adminIds])];
 
-      const { data: dentistRoles } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'dentist');
-      const dentistRoleIds = (dentistRoles || []).map(a => a.user_id).filter(Boolean);
-
-      const excludeIds = [...new Set([...dentistIds, ...adminIds, ...dentistRoleIds])];
-
-      let patientQuery = supabase
+      let query = supabase
         .from('profiles')
-        .select('id', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true });
 
       if (excludeIds.length > 0) {
-        const excludeList = excludeIds.join(',');
-        patientQuery = patientQuery.not('id', 'in', `(${excludeList})`);
+        query = query.not('id', 'in', `(${excludeIds.join(',')})`);
       }
 
-      const { count: totalPatients } = await patientQuery;
+      const { count: patientsCount } = await query;
 
-      // Get today's appointments
-      const today = new Date().toISOString().split('T')[0];
-      const { count: todayAppointments } = await supabase
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const { count: appointmentsCount } = await supabase
         .from('appointments')
         .select('*', { count: 'exact', head: true })
-        .gte('appointment_date', today)
-        .lte('appointment_date', today);
+        .gte('scheduled_at', today.toISOString())
+        .lt('scheduled_at', new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString());
 
-      // Get pending appointments
-      const { count: pendingAppointments } = await supabase
+      const { count: pendingCount } = await supabase
         .from('appointments')
         .select('*', { count: 'exact', head: true })
-        .in('status', ['pending', 'confirmed', 'upcoming']);
+        .eq('status', 'pending');
 
-      // Get completed appointments
-      const { count: completedAppointments } = await supabase
+      const { count: completedCount } = await supabase
         .from('appointments')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'completed');
 
       return {
-        totalPatients: totalPatients || 0,
-        todayAppointments: todayAppointments || 0,
-        pendingAppointments: pendingAppointments || 0,
-        completedAppointments: completedAppointments || 0,
+        totalPatients: patientsCount || 0,
+        todayAppointments: appointmentsCount || 0,
+        pendingAppointments: pendingCount || 0,
+        completedAppointments: completedCount || 0,
       };
     } catch (error) {
       logger.error('Failed to load dashboard stats', { error });
@@ -699,8 +811,7 @@ export class AdminService {
             doc
               .fontSize(12)
               .text(
-                `${index + 1}. ${dentist.name} (${dentist.specialization || 'General'}) - Total: ${
-                  dentist.totalAppointments
+                `${index + 1}. ${dentist.name} (${dentist.specialization || 'General'}) - Total: ${dentist.totalAppointments
                 }, Upcoming: ${dentist.upcomingAppointments}`
               );
           });
@@ -716,8 +827,7 @@ export class AdminService {
             doc
               .fontSize(12)
               .text(
-                `• [${alert.severity.toUpperCase()}] ${alert.table} ${alert.eventType} at ${
-                  alert.createdAt
+                `• [${alert.severity.toUpperCase()}] ${alert.table} ${alert.eventType} at ${alert.createdAt
                 } - ${alert.description}`
               );
           });
@@ -729,10 +839,9 @@ export class AdminService {
         doc.fontSize(12).list([
           `Total Errors Logged: ${analytics.errorSummary.totalEvents}`,
           `Errors in Last 24h: ${analytics.errorSummary.last24h}`,
-          `Tables Impacted: ${
-            analytics.errorSummary.tablesImpacted.length > 0
-              ? analytics.errorSummary.tablesImpacted.join(', ')
-              : 'None'
+          `Tables Impacted: ${analytics.errorSummary.tablesImpacted.length > 0
+            ? analytics.errorSummary.tablesImpacted.join(', ')
+            : 'None'
           }`,
         ]);
 

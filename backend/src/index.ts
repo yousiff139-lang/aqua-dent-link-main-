@@ -12,6 +12,15 @@ const startServer = async () => {
     if (!isConnected) {
       logger.warn('⚠️  Supabase connection test failed, but continuing startup...');
       logger.warn('Some features may not work until Supabase is properly configured.');
+    } else {
+      // Test admin permissions if connection is successful
+      const { testAdminPermissions } = await import('./config/supabase.js');
+      const hasAdminPerms = await testAdminPermissions();
+      if (!hasAdminPerms) {
+        logger.error('❌ Service role key does not have admin permissions!');
+        logger.error('   Dentist creation will fail. Please verify SUPABASE_SERVICE_ROLE_KEY in .env file.');
+        logger.error('   The service role key should start with "eyJ..." and be different from the anon key.');
+      }
     }
 
     const app = createApp();

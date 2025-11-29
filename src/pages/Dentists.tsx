@@ -1,14 +1,52 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Star, Calendar, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ChatbotWidget } from "@/components/ChatbotWidget";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useDentists } from "@/hooks/useDentists";
+import { BookingModal } from "@/components/BookingModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const Dentists = () => {
   const { data: dentists, isLoading, error } = useDentists();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [selectedDentist, setSelectedDentist] = useState<any>(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+
+  const handleBookAppointment = (dentist: any) => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to book an appointment.",
+        variant: "default",
+      });
+      navigate('/auth');
+      return;
+    }
+    setSelectedDentist(dentist);
+    setShowBookingModal(true);
+  };
+
+  const handleBookingSuccess = (data: {
+    appointmentId: string;
+    date: string;
+    time: string;
+    paymentMethod: "stripe" | "cash";
+    paymentStatus: "pending" | "paid";
+  }) => {
+    setShowBookingModal(false);
+    setSelectedDentist(null);
+    toast({
+      title: "Appointment booked!",
+      description: `Your appointment with ${selectedDentist?.name} has been confirmed for ${data.date} at ${data.time}.`,
+    });
+  };
 
   // Placeholder image for dentists without image_url
   const placeholderImage = "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=800&h=800&fit=crop";
@@ -112,12 +150,13 @@ const Dentists = () => {
                       <Link to={`/dentist/${dentist.id}`}>
                         <Button variant="outline" className="w-full">View Profile</Button>
                       </Link>
-                      <Link to={`/dentist/${dentist.id}`}>
-                        <Button className="w-full gradient-primary text-primary-foreground transition-bounce hover:scale-105">
-                          <Calendar className="w-4 h-4 mr-2" />
-                          Book Now
-                        </Button>
-                      </Link>
+                      <Button 
+                        onClick={() => handleBookAppointment(dentist)}
+                        className="w-full gradient-primary text-primary-foreground transition-bounce hover:scale-105"
+                      >
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Book Now
+                      </Button>
                     </div>
                   </div>
                 </Card>
@@ -129,6 +168,18 @@ const Dentists = () => {
       
       <Footer />
       <ChatbotWidget />
+
+      {/* Booking Modal */}
+      {selectedDentist && (
+        <BookingModal
+          open={showBookingModal}
+          onOpenChange={setShowBookingModal}
+          dentistId={selectedDentist.id}
+          dentistName={selectedDentist.name}
+          dentistEmail={selectedDentist.email}
+          onSuccess={handleBookingSuccess}
+        />
+      )}
     </div>
   );
 };
