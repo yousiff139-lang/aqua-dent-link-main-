@@ -6,10 +6,10 @@ import routes from './routes/index.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { apiLimiter } from './middleware/rate-limiter.js';
 import { supabase } from './config/supabase.js';
-import { 
-  requestIdMiddleware, 
-  requestLoggerMiddleware, 
-  userIdExtractorMiddleware 
+import {
+  requestIdMiddleware,
+  requestLoggerMiddleware,
+  userIdExtractorMiddleware
 } from './middleware/request-logger.js';
 
 // Create Express application
@@ -21,17 +21,17 @@ export const createApp = (): Application => {
     origin: corsOrigins,
     credentials: true,
   }));
-  
+
   // Special handling for Stripe webhook - capture raw body before JSON parsing
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.originalUrl.includes('/webhook')) {
       let data = '';
       req.setEncoding('utf8');
-      
+
       req.on('data', (chunk) => {
         data += chunk;
       });
-      
+
       req.on('end', () => {
         (req as any).rawBody = data;
         // Parse JSON manually for webhook endpoint
@@ -48,17 +48,18 @@ export const createApp = (): Application => {
       next();
     }
   });
-  
+
   // Standard JSON parsing for non-webhook endpoints
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (!req.originalUrl.includes('/webhook')) {
-      express.json()(req, res, next);
+      // Increase limit to 50MB to support base64 image uploads
+      express.json({ limit: '50mb' })(req, res, next);
     } else {
       next();
     }
   });
-  
-  app.use(express.urlencoded({ extended: true }));
+
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
   // Add request ID to all requests for tracing
   app.use(requestIdMiddleware);

@@ -80,7 +80,7 @@ export default function AddDoctor() {
           ? Number(formData.years_of_experience)
           : undefined,
         education: formData.education.trim() || undefined,
-        bio: formData.bio.trim() || undefined,
+        bio: formData.bio.trim() || 'Experienced dental professional dedicated to providing quality care.',
         availability: availability.length > 0 ? availability : undefined,
       }
 
@@ -106,6 +106,8 @@ export default function AddDoctor() {
       
       // Extract detailed error message from backend response
       let errorMessage = 'Please try again later.';
+      let errorTitle = 'Failed to add dentist';
+      
       if (error.message) {
         errorMessage = error.message;
       } else if (error.response?.data?.error?.message) {
@@ -115,11 +117,33 @@ export default function AddDoctor() {
       } else if (typeof error === 'string') {
         errorMessage = error;
       }
+
+      // Detect service role key issues and provide actionable guidance
+      const lowerMessage = errorMessage.toLowerCase();
+      if (lowerMessage.includes('service role key') || 
+          lowerMessage.includes('authentication configuration') ||
+          lowerMessage.includes('unexpected_failure') ||
+          lowerMessage.includes('eyj') ||
+          lowerMessage.includes('sb_')) {
+        errorTitle = 'Configuration Error';
+        errorMessage = 
+          'The backend service role key is misconfigured. ' +
+          'Please check the backend .env file and ensure SUPABASE_SERVICE_ROLE_KEY is set correctly. ' +
+          'Get the service_role key from Supabase Dashboard > Settings > API > service_role key (secret). ' +
+          'The key should start with "eyJ", not "sb_".';
+      } else if (lowerMessage.includes('already registered') || lowerMessage.includes('already exists')) {
+        errorTitle = 'Email Already Registered';
+      } else if (lowerMessage.includes('invalid email')) {
+        errorTitle = 'Invalid Email Address';
+      } else if (lowerMessage.includes('password')) {
+        errorTitle = 'Password Error';
+      }
       
       toast({
-        title: 'Failed to add dentist',
+        title: errorTitle,
         description: errorMessage,
         variant: 'destructive',
+        duration: 8000, // Show longer for configuration errors
       })
     } finally {
       setIsSubmitting(false)
@@ -261,14 +285,17 @@ export default function AddDoctor() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="bio">Bio</Label>
+                <Label htmlFor="bio">Bio (Optional)</Label>
                 <Textarea
                   id="bio"
                   value={formData.bio}
                   onChange={(e) => handleChange('bio', e.target.value)}
-                  placeholder="Share a short biography to highlight experience, style of care, and specialties."
+                  placeholder="Experienced dental professional dedicated to providing quality care."
                   rows={5}
                 />
+                <p className="text-xs text-gray-500">
+                  If left empty, the default description will be used: "Experienced dental professional dedicated to providing quality care."
+                </p>
               </div>
 
               {/* Weekly Availability Schedule */}

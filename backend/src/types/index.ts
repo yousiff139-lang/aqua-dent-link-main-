@@ -37,6 +37,17 @@ export interface Appointment {
   dentist_notes?: string;
   patient_notes?: string;
   medical_history?: string;
+  // New medical fields
+  gender?: string;
+  is_pregnant?: boolean;
+  chronic_diseases?: string;
+  medications?: string;
+  allergies?: string;
+  previous_dental_work?: string;
+  smoking?: boolean;
+  symptoms?: string;
+  chief_complaint?: string;
+
   stripe_session_id?: string;
   stripe_payment_intent_id?: string;
   booking_reference?: string;
@@ -74,6 +85,17 @@ export interface CreateAppointmentDTO {
   notes?: string;
   patient_notes?: string;
   medical_history?: string;
+  // New medical fields
+  gender?: string;
+  is_pregnant?: boolean;
+  chronic_diseases?: string;
+  medications?: string;
+  allergies?: string;
+  previous_dental_work?: string;
+  smoking?: boolean;
+  symptoms?: string;
+  chief_complaint?: string;
+  documents?: any; // JSONB for uploaded files
 }
 
 export interface UpdateAppointmentDTO {
@@ -128,6 +150,7 @@ export interface Dentist {
   years_of_experience?: number;
   education?: string;
   rating?: number;
+  image_url?: string;
   available_times?: AvailabilitySchedule;
   created_at: Date;
   updated_at: Date;

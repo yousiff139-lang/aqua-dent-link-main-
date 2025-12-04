@@ -15,6 +15,7 @@ export type AvailabilityCallback = (dentistId: string, availability: any) => voi
  */
 export function useRealtimeAppointments(
   dentistId: string | undefined,
+  dentistEmail: string | undefined,
   callbacks: {
     onCreated?: AppointmentCallback;
     onUpdated?: AppointmentCallback;
@@ -31,7 +32,7 @@ export function useRealtimeAppointments(
   }, [callbacks]);
 
   useEffect(() => {
-    if (!dentistId) {
+    if (!dentistId && !dentistEmail) {
       setIsSubscribed(false);
       return;
     }
@@ -39,7 +40,12 @@ export function useRealtimeAppointments(
     let channel: RealtimeChannel;
 
     try {
-      const channelKey = `appointments:dentist:${dentistId}`;
+      const channelKey = `appointments:dentist:${dentistId || 'email:' + dentistEmail}`;
+
+      // Create filter string - prefer email as it's more reliable across tables
+      const filter = dentistEmail
+        ? `dentist_email=eq.${dentistEmail}`
+        : `dentist_id=eq.${dentistId}`;
 
       channel = supabase
         .channel(channelKey)
@@ -49,7 +55,7 @@ export function useRealtimeAppointments(
             event: 'INSERT',
             schema: 'public',
             table: 'appointments',
-            filter: `dentist_id=eq.${dentistId}`,
+            filter,
           },
           (payload) => {
             console.log('Real-time: New appointment created for dentist', payload.new?.id);
@@ -62,7 +68,7 @@ export function useRealtimeAppointments(
             event: 'UPDATE',
             schema: 'public',
             table: 'appointments',
-            filter: `dentist_id=eq.${dentistId}`,
+            filter,
           },
           (payload) => {
             console.log('Real-time: Appointment updated for dentist', payload.new?.id);
@@ -75,7 +81,7 @@ export function useRealtimeAppointments(
             event: 'DELETE',
             schema: 'public',
             table: 'appointments',
-            filter: `dentist_id=eq.${dentistId}`,
+            filter,
           },
           (payload) => {
             console.log('Real-time: Appointment deleted for dentist', payload.old?.id);
@@ -86,7 +92,7 @@ export function useRealtimeAppointments(
         )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            console.log('Successfully subscribed to appointment updates', { dentistId });
+            console.log('Successfully subscribed to appointment updates', { dentistId, dentistEmail });
             setIsSubscribed(true);
             setError(null);
           } else if (status === 'CHANNEL_ERROR') {
@@ -108,7 +114,7 @@ export function useRealtimeAppointments(
       setError(err instanceof Error ? err : new Error('Unknown error'));
       setIsSubscribed(false);
     }
-  }, [dentistId]);
+  }, [dentistId, dentistEmail]);
 
   return { isSubscribed, error };
 }

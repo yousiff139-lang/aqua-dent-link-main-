@@ -275,6 +275,17 @@ export class AppointmentsRepository {
           notes: data.notes,
           patient_notes: data.patient_notes,
           medical_history: data.medical_history,
+          // New medical fields
+          gender: data.gender,
+          is_pregnant: data.is_pregnant,
+          chronic_diseases: data.chronic_diseases,
+          medications: data.medications,
+          allergies: data.allergies,
+          previous_dental_work: data.previous_dental_work,
+          smoking: data.smoking,
+          symptoms: data.symptoms,
+          chief_complaint: data.chief_complaint,
+          documents: data.documents, // Persist uploaded documents
         })
         .select()
         .single();
@@ -351,6 +362,24 @@ export class AppointmentsRepository {
       }
       if (data.notes !== undefined) {
         updateData.notes = data.notes;
+      }
+
+      // Handle completed_at field (for marking appointments as completed)
+      if ((data as any).completed_at !== undefined) {
+        updateData.completed_at = (data as any).completed_at;
+      }
+
+      // Handle cancelled_at and cancellation_reason (for cancelling appointments)
+      if ((data as any).cancelled_at !== undefined) {
+        updateData.cancelled_at = (data as any).cancelled_at;
+      }
+      if ((data as any).cancellation_reason !== undefined) {
+        updateData.cancellation_reason = (data as any).cancellation_reason;
+      }
+
+      // Handle documents update (for post-booking uploads)
+      if ((data as any).documents !== undefined) {
+        updateData.documents = (data as any).documents;
       }
 
       // If updating date/time, check slot availability

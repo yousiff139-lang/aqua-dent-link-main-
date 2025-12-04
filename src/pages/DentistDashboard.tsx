@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Calendar, Clock, User, FileText, Download, AlertCircle, Phone, Mail } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { generateAppointmentPDF, pdfToBlob } from "@/services/pdfGenerator";
 import {
   Dialog,
   DialogContent,
@@ -84,11 +85,22 @@ const DentistDashboard = () => {
 
       setDentistProfile(profile);
 
-      // Load appointments with patient details
+      // Load appointments with patient details and medical information
       const { data: appts } = await supabase
         .from('appointments')
         .select(`
           *,
+          symptoms,
+          chronic_diseases,
+          gender,
+          is_pregnant,
+          medications,
+          allergies,
+          previous_dental_work,
+          smoking,
+          chief_complaint,
+          medical_history,
+          documents,
           patient:profiles!appointments_patient_id_fkey(full_name, email, phone)
         `)
         .eq('dentist_id', user.id)
@@ -145,6 +157,83 @@ const DentistDashboard = () => {
       });
     }
   };
+
+
+  const handleDownloadPDF = async (appointment: any) => {
+    try {
+      // Fetch medical information from dedicated table
+      const { data: medicalInfo, error: medicalError } = await supabase
+        .from('appointment_medical_info')
+        .select('*')
+        .eq('appointment_id', appointment.id)
+        .single();
+
+      if (medicalError) {
+        console.error('Error fetching medical info:', medicalError);
+      }
+
+      // Use medical info from dedicated table if available, fallback to appointment data
+      const documents = medicalInfo?.documents || appointment.documents || [];
+      console.log('Raw documents from DB:', documents);
+      console.log('Medical info:', medicalInfo);
+
+      const documentUrls = Array.isArray(documents)
+        ? documents.map((doc: any) => doc.url || doc)
+        : [];
+
+      console.log('Extracted document URLs:', documentUrls);
+
+      const gender = medicalInfo?.gender || appointment.gender;
+      const isFemale = gender?.toLowerCase() === 'female';
+
+      const pdfData = {
+        patientName: appointment.patient?.full_name || 'Unknown',
+        dentistName: dentistProfile?.profiles?.full_name || 'Unknown',
+        symptoms: medicalInfo?.symptoms || appointment.symptoms || appointment.reason || 'Not specified',
+        appointmentTime: appointment.appointment_time || '',
+        appointmentDate: appointment.appointment_date || '',
+        paymentMethod: (appointment.payment_method || 'cash') as 'cash' | 'card',
+        bookingReference: appointment.booking_reference || appointment.id,
+        gender: gender,
+        // Only include pregnancy status if patient is female
+        isPregnant: isFemale ? (medicalInfo?.is_pregnant || appointment.is_pregnant) : undefined,
+        chronicDiseases: medicalInfo?.chronic_diseases || appointment.chronic_diseases,
+        medicalHistory: medicalInfo?.medical_history || appointment.medical_history,
+        medications: medicalInfo?.medications || appointment.medications,
+        allergies: medicalInfo?.allergies || appointment.allergies,
+        previousDentalWork: medicalInfo?.previous_dental_work || appointment.previous_dental_work,
+        smoking: medicalInfo?.smoking ?? appointment.smoking,
+        documentUrls: documentUrls,
+      };
+
+      console.log('PDF Data being passed:', pdfData);
+
+      const pdfBytes = generateAppointmentPDF(pdfData);
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `appointment-${appointment.booking_reference || appointment.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Success",
+        description: "PDF downloaded successfully"
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF",
+        variant: "destructive"
+      });
+    }
+  };
+
 
   const handleAddAvailability = async () => {
     const dayOfWeek = 1; // Monday as default
@@ -229,7 +318,7 @@ const DentistDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="mb-8">
           <h1 className="text-4xl font-bold gradient-text mb-2">Dentist Dashboard</h1>
@@ -309,8 +398,8 @@ const DentistDashboard = () => {
                               <h3 className="font-semibold text-lg">{appointment.patient?.full_name}</h3>
                               <Badge variant={
                                 appointment.status === 'upcoming' ? 'default' :
-                                appointment.status === 'completed' ? 'secondary' :
-                                'outline'
+                                  appointment.status === 'completed' ? 'secondary' :
+                                    'outline'
                               }>
                                 {appointment.status}
                               </Badge>
@@ -333,15 +422,15 @@ const DentistDashboard = () => {
                               )}
                             </div>
                           </div>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => handleViewAppointment(appointment)}
                           >
                             View Details
                           </Button>
                         </div>
-                        
+
                         <div className="grid md:grid-cols-2 gap-3 text-sm">
                           <div>
                             <span className="font-medium">Date & Time:</span>
@@ -354,7 +443,7 @@ const DentistDashboard = () => {
                             <p className="text-muted-foreground">{appointment.appointment_type}</p>
                           </div>
                         </div>
-                        
+
                         {appointment.symptoms && (
                           <div className="mt-3 p-3 bg-muted rounded-md">
                             <div className="flex items-start gap-2">
@@ -426,7 +515,7 @@ const DentistDashboard = () => {
               Complete patient information and appointment details
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedAppointment && (
             <div className="space-y-6">
               {/* Patient Information */}
@@ -475,8 +564,8 @@ const DentistDashboard = () => {
                       <p className="text-sm font-medium">Status</p>
                       <Badge variant={
                         selectedAppointment.status === 'upcoming' ? 'default' :
-                        selectedAppointment.status === 'completed' ? 'secondary' :
-                        'outline'
+                          selectedAppointment.status === 'completed' ? 'secondary' :
+                            'outline'
                       }>
                         {selectedAppointment.status}
                       </Badge>
@@ -490,7 +579,7 @@ const DentistDashboard = () => {
                       </div>
                     )}
                   </div>
-                  
+
                   {selectedAppointment.symptoms && (
                     <div className="mt-4">
                       <p className="text-sm font-medium mb-2">Symptoms / Chief Complaint</p>
@@ -520,7 +609,97 @@ const DentistDashboard = () => {
                 </CardContent>
               </Card>
 
-              {/* Documents - Will be populated when patient uploads documents via chatbot */}
+              {/* Medical Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Medical Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {selectedAppointment.gender && (
+                      <div>
+                        <p className="text-sm font-medium">Gender</p>
+                        <p className="text-sm text-muted-foreground capitalize">{selectedAppointment.gender}</p>
+                      </div>
+                    )}
+                    {selectedAppointment.is_pregnant !== undefined && selectedAppointment.is_pregnant !== null && (
+                      <div>
+                        <p className="text-sm font-medium">Pregnant</p>
+                        <p className="text-sm text-muted-foreground">{selectedAppointment.is_pregnant ? 'Yes' : 'No'}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedAppointment.chronic_diseases && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium mb-2">Chronic Diseases</p>
+                      <div className="p-3 bg-muted rounded-md">
+                        <p className="text-sm text-muted-foreground">{selectedAppointment.chronic_diseases}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedAppointment.medications && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium mb-2">Current Medications</p>
+                      <div className="p-3 bg-muted rounded-md">
+                        <p className="text-sm text-muted-foreground">{selectedAppointment.medications}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedAppointment.allergies && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium mb-2">Allergies</p>
+                      <div className="p-3 bg-muted rounded-md">
+                        <p className="text-sm text-muted-foreground">{selectedAppointment.allergies}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedAppointment.previous_dental_work && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium mb-2">Previous Dental Work</p>
+                      <div className="p-3 bg-muted rounded-md">
+                        <p className="text-sm text-muted-foreground">{selectedAppointment.previous_dental_work}</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Uploaded Documents */}
+              {selectedAppointment.documents && Array.isArray(selectedAppointment.documents) && selectedAppointment.documents.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      Uploaded Documents
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {selectedAppointment.documents.map((doc: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-md border">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                            <span className="text-sm truncate" title={doc.name}>{doc.name}</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(doc.url, '_blank')}
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Additional Notes */}
               {selectedAppointment.notes && (
                 <Card>
                   <CardHeader>

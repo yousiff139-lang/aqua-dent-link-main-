@@ -24,8 +24,8 @@ export default function Doctors() {
 
       // 1) Try backend API first
       try {
-        const response = await api.get<AdminDentistsResponse>('/admin/dentists')
-        const responseData = response as any
+      const response = await api.get<AdminDentistsResponse>('/admin/dentists')
+      const responseData = response as any
         const backendDoctors = responseData?.data
 
         if (Array.isArray(backendDoctors) && backendDoctors.length > 0) {

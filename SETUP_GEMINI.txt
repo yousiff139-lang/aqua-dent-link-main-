@@ -1,0 +1,5 @@
+# ⚠️ IMPORTANT: Add Your Gemini API Key
+
+VITE_GEMINI_API_KEY=AIzaSyA_QzqnZnnjyOcn4JU3o_NWdAA4XukrqVQ
+
+# Other environment variables from .env.example

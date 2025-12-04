@@ -1,212 +1,163 @@
-import { Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { Request, Response } from 'express';
+import { asyncHandler } from '../utils/async-handler.js';
 import { chatbotService } from '../services/chatbot.service.js';
+import { geminiService } from '../services/gemini.service.js';
+import { AppError } from '../utils/errors.js';
+import { knowledgeBaseService } from '../services/knowledge-base.service.js';
 import { logger } from '../config/logger.js';
 
-// Validation schemas
-const ChatMessageSchema = z.object({
-  conversation_id: z.string().optional(),
-  user_id: z.string().optional(),
-  message: z.string().min(1).max(1000),
-  session_token: z.string().optional(),
-});
 
-const GeneratePDFSchema = z.object({
-  appointment_id: z.string().uuid(),
-});
-
-const AvailableSlotsSchema = z.object({
-  dentist_id: z.string().uuid().optional(),
-  specialization: z.string().optional(),
-  date: z.string().optional(),
-});
-
-/**
- * Chatbot Controller
- * Handles chatbot conversation, PDF generation, and slot queries
- */
-export class ChatbotController {
+export const chatbotController = {
   /**
-   * POST /api/chatbot/message
-   * Process chatbot message and return response
+   * Start a new conversation
    */
-  async sendMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { conversation_id, user_id, message, session_token } = ChatMessageSchema.parse(req.body);
-      
-      // Determine user ID (authenticated user or guest session)
-      const userId = user_id || session_token || req.user?.id;
-      
-      if (!userId) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'MISSING_USER_ID',
-            message: 'User ID or session token required',
-          },
-        });
-        return;
-      }
+  startConversation: asyncHandler(async (req: Request, res: Response) => {
+    const { userId, userName, userEmail } = req.body;
 
-      // Process message through chatbot service
-      const response = await chatbotService.handleMessage({
-        userId,
-        conversationId: conversation_id,
-        message,
-      });
-
-      logger.info('Chatbot message processed', {
-        userId,
-        conversationId: response.conversationId,
-        state: response.state,
-      });
-
-      res.status(200).json({
-        success: true,
-        data: response,
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid request data',
-            details: error.errors,
-          },
-        });
-        return;
-      }
-      next(error);
+    if (!userId || !userName || !userEmail) {
+      throw AppError.validation('userId, userName, and userEmail are required');
     }
-  }
+
+    const conversation = await chatbotService.startConversation(userId, userName, userEmail);
+
+    // Send greeting
+    const greeting = await chatbotService.processMessage(conversation.id, 'start');
+
+    res.json({
+      success: true,
+      data: {
+        conversationId: conversation.id,
+        message: greeting,
+      },
+    });
+  }),
 
   /**
-   * GET /api/chatbot/conversation/:id
-   * Retrieve conversation history
+   * Send a message in an existing conversation
    */
-  async getConversation(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      const userId = req.user?.id;
+  sendMessage: asyncHandler(async (req: Request, res: Response) => {
+    const { conversationId, message } = req.body;
 
-      if (!userId) {
-        res.status(401).json({
-          success: false,
-          error: {
-            code: 'UNAUTHORIZED',
-            message: 'Authentication required',
-          },
-        });
-        return;
-      }
-
-      const conversation = await chatbotService.getConversation(id, userId);
-
-      if (!conversation) {
-        res.status(404).json({
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Conversation not found',
-          },
-        });
-        return;
-      }
-
-      res.status(200).json({
-        success: true,
-        data: conversation,
-      });
-    } catch (error) {
-      next(error);
+    if (!conversationId || !message) {
+      throw AppError.validation('conversationId and message are required');
     }
-  }
+
+    const response = await chatbotService.processMessage(conversationId, message);
+
+    res.json({
+      success: true,
+      data: {
+        message: response,
+      },
+    });
+  }),
 
   /**
-   * POST /api/chatbot/generate-pdf
-   * Generate PDF summary for appointment
+   * Get conversation state
    */
-  async generatePDF(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { appointment_id } = GeneratePDFSchema.parse(req.body);
-      const userId = req.user?.id;
+  getConversation: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
 
-      if (!userId) {
-        res.status(401).json({
-          success: false,
-          error: {
-            code: 'UNAUTHORIZED',
-            message: 'Authentication required',
-          },
-        });
-        return;
+    const conversation = chatbotService.getConversation(id);
+
+    if (!conversation) {
+      throw AppError.notFound('Conversation not found');
+    }
+
+    res.json({
+      success: true,
+      data: conversation,
+    });
+  }),
+
+
+
+  /**
+   * Ask a quick question (stateless)
+   * Prioritizes AI with internet search for accurate answers, uses local KB as fallback
+   */
+  askQuestion: asyncHandler(async (req: Request, res: Response) => {
+    const { question, type = 'general' } = req.body;
+
+    if (!question) {
+      throw AppError.validation('question is required');
+    }
+
+    let answer: string;
+
+    // PRIORITY: Use AI with internet search for accurate, current answers
+    // Only use local knowledge base as a fallback if AI fails
+    try {
+      if (type === 'general') {
+        // Use Gemini with internet search for general dentistry questions
+        // This ensures we get the most current and accurate information
+        answer = await geminiService.answerDentistryQuestion(question);
+      } else {
+        // Use Gemini for other question types
+        answer = await geminiService.askQuestion(question);
       }
 
-      const pdfUrl = await chatbotService.generateAppointmentPDF(appointment_id, userId);
-
-      logger.info('PDF generated successfully', {
-        appointmentId: appointment_id,
-        userId,
-        pdfUrl,
+      logger.info('Successfully answered question using AI with internet search', {
+        question: question.substring(0, 50)
       });
 
-      res.status(200).json({
+      return res.json({
         success: true,
         data: {
-          pdf_url: pdfUrl,
+          question,
+          answer,
         },
       });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid request data',
-            details: error.errors,
+    } catch (error: any) {
+      logger.error('Error calling Gemini API, falling back to local knowledge base', {
+        error: error.message,
+        question: question.substring(0, 50)
+      });
+
+      // Fallback: try local knowledge base if AI fails
+      // Fallback: try local knowledge base if AI fails
+      const kbResult = knowledgeBaseService.searchByQuestion(question);
+      if (kbResult && kbResult.confidence >= 0.6) {
+        logger.info('Using local knowledge base as fallback', { question: question.substring(0, 50) });
+        return res.json({
+          success: true,
+          data: {
+            question,
+            answer: kbResult.answer,
           },
         });
-        return;
       }
-      next(error);
+
+      // If all else fails, provide a helpful error message
+      throw AppError.internal('Unable to process question. Please try rephrasing or book an appointment for personalized advice.');
     }
-  }
+  }),
 
   /**
-   * GET /api/chatbot/available-slots
-   * Query available appointment slots
+   * Upload a document
    */
-  async getAvailableSlots(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { dentist_id, specialization, date } = AvailableSlotsSchema.parse(req.query);
+  uploadDocument: asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = req.body;
+    const file = req.file;
 
-      const slots = await chatbotService.getAvailableSlots({
-        dentistId: dentist_id,
-        specialization,
-        date,
-      });
-
-      res.status(200).json({
-        success: true,
-        data: slots,
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid query parameters',
-            details: error.errors,
-          },
-        });
-        return;
-      }
-      next(error);
+    if (!file) {
+      throw AppError.validation('No file uploaded');
     }
-  }
-}
 
-// Export singleton instance
-export const chatbotController = new ChatbotController();
+    if (!userId) {
+      throw AppError.validation('userId is required');
+    }
+
+    const publicUrl = await chatbotService.uploadDocument(file, userId);
+
+    res.json({
+      success: true,
+      data: {
+        url: publicUrl,
+        name: file.originalname,
+        type: file.mimetype,
+        size: file.size,
+      },
+    });
+  }),
+};

@@ -46,9 +46,21 @@ export class AppointmentsService {
       const appointmentDate = new Date(data.appointment_date);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       if (appointmentDate < today) {
         throw AppError.validation('Appointment date cannot be in the past');
+      }
+
+      // If appointment is today, check if time has passed
+      if (appointmentDate.getTime() === today.getTime()) {
+        const now = new Date();
+        const [hours, minutes] = data.appointment_time.split(':').map(Number);
+        const appointmentTime = new Date();
+        appointmentTime.setHours(hours, minutes, 0, 0);
+
+        if (appointmentTime <= now) {
+          throw AppError.validation('Cannot book appointment in the past');
+        }
       }
 
       // Check slot availability
@@ -88,15 +100,26 @@ export class AppointmentsService {
           .eq('email', data.dentist_email)
           .single();
 
-        if (error || !profile) {
-          logger.error('Failed to find dentist by email', { 
-            dentistEmail: data.dentist_email, 
-            error 
-          });
-          throw AppError.validation('Dentist not found with the provided email');
-        }
+        if (profile) {
+          dentistId = profile.id;
+        } else {
+          // If not found in profiles, try dentists table
+          const { data: dentist, error: dentistError } = await (await import('../config/supabase.js')).supabase
+            .from('dentists')
+            .select('id')
+            .eq('email', data.dentist_email)
+            .single();
 
-        dentistId = profile.id;
+          if (dentistError || !dentist) {
+            logger.error('Failed to find dentist by email in profiles or dentists table', {
+              dentistEmail: data.dentist_email,
+              error: error || dentistError
+            });
+            throw AppError.validation('Dentist not found with the provided email');
+          }
+
+          dentistId = dentist.id;
+        }
       }
 
       // Create appointment
@@ -148,7 +171,7 @@ export class AppointmentsService {
       // Check if user is authorized (patient or dentist)
       const isPatient = existing.patient_id === userId;
       const isDentist = existing.dentist_id === userId;
-      
+
       // Also check by email (for dentist portal authentication)
       let isDentistByEmail = false;
       if (!isDentist && userId) {
@@ -157,12 +180,12 @@ export class AppointmentsService {
           .select('email')
           .eq('id', userId)
           .single();
-        
+
         if (userProfile?.email === existing.dentist_email) {
           isDentistByEmail = true;
         }
       }
-      
+
       if (!isPatient && !isDentist && !isDentistByEmail) {
         throw AppError.forbidden('Not authorized to update this appointment');
       }
@@ -176,14 +199,14 @@ export class AppointmentsService {
         const appointmentDate = new Date(newDate);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
+
         if (appointmentDate < today) {
           throw AppError.validation('Appointment date cannot be in the past');
         }
 
         // Check slot availability if date or time changed
-        if (newDate !== existing.appointment_date.toString().split('T')[0] || 
-            newTime !== existing.appointment_time) {
+        if (newDate !== existing.appointment_date.toString().split('T')[0] ||
+          newTime !== existing.appointment_time) {
           const isAvailable = await this.checkSlotAvailability(
             existing.dentist_email,
             newDate,
@@ -238,7 +261,7 @@ export class AppointmentsService {
   /**
    * Cancel an appointment
    */
-  async cancelAppointment(id: string, userId: string): Promise<void> {
+  async cancelAppointment(id: string, userId: string): Promise<Appointment> {
     try {
       // Verify appointment exists and user has access
       const existing = await appointmentsRepository.findById(id);
@@ -248,25 +271,88 @@ export class AppointmentsService {
       }
 
       // Check if user is authorized (patient or dentist)
-      if (existing.patient_id !== userId && existing.dentist_id !== userId) {
+      // For dentist portal, userId is dentistId, so we need to check by email or ID
+      const supabaseClient = (await import('../config/supabase.js')).supabase;
+
+      // Check if user is dentist
+      const { data: dentistRecord } = await supabaseClient
+        .from('dentists')
+        .select('id, email')
+        .eq('id', userId)
+        .maybeSingle();
+
+      let isAuthorized = false;
+      let userEmail: string | null = null;
+      let isAdmin = false;
+
+      if (dentistRecord) {
+        // This is a dentist - check if they're the dentist for this appointment
+        userEmail = dentistRecord.email;
+        isAuthorized = existing.dentist_id === userId ||
+          existing.dentist_email === dentistRecord.email;
+      } else {
+        // Try to find in profiles table (for Supabase auth users)
+        const { data: userProfile, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('id, email, role')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (!profileError && userProfile) {
+          userEmail = userProfile.email;
+          isAdmin = userProfile.role === 'admin';
+          isAuthorized = isAdmin ||
+            existing.patient_id === userId ||
+            existing.dentist_id === userId ||
+            existing.dentist_email === userProfile.email;
+        }
+
+        // Also check user_roles table
+        if (!isAuthorized) {
+          const { data: userRole } = await supabaseClient
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          if (userRole) {
+            isAdmin = isAdmin || userRole.role === 'admin';
+            isAuthorized = isAdmin || existing.patient_id === userId || existing.dentist_id === userId;
+          }
+        }
+      }
+
+      if (!isAuthorized) {
+        logger.warn('Unauthorized attempt to cancel appointment', {
+          userId,
+          userEmail,
+          appointmentId: id,
+          dentistEmail: existing.dentist_email,
+          dentistId: existing.dentist_id,
+        });
         throw AppError.forbidden('Not authorized to cancel this appointment');
       }
 
-      // Cancel appointment (soft delete by setting status to cancelled)
-      await appointmentsRepository.delete(id);
-
-      // Update status to cancelled for broadcast
-      const cancelledAppointment = { ...existing, status: 'cancelled' as const };
+      // Cancel appointment by updating status to cancelled (don't delete)
+      const cancelled = await appointmentsRepository.update(id, {
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: 'Cancelled by dentist',
+      } as any);
 
       logger.info('Appointment cancelled successfully', {
         appointmentId: id,
         userId,
+        userEmail,
+        status: cancelled.status,
       });
 
       // Real-time sync is handled automatically by Supabase database triggers
-      logger.debug('Appointment deletion will be broadcast via database trigger', {
-        appointmentId: cancelledAppointment.id,
+      logger.debug('Appointment cancellation will be broadcast via database trigger', {
+        appointmentId: cancelled.id,
       });
+
+      return cancelled;
     } catch (error) {
       if (error instanceof AppError) throw error;
       logger.error('Failed to cancel appointment', { id, userId, error });
@@ -298,7 +384,7 @@ export class AppointmentsService {
   ): Promise<PaginatedResponse<Appointment>> {
     try {
       const appointments = await appointmentsRepository.findByDentistEmail(dentistEmail, filters);
-      
+
       // Calculate pagination info
       const limit = filters?.limit || 20;
       const offset = filters?.offset || 0;
@@ -358,44 +444,67 @@ export class AppointmentsService {
 
       const supabaseClient = (await import('../config/supabase.js')).supabase;
 
-      // Get user profile to check if they're a dentist
-      const { data: userProfile, error: profileError } = await supabaseClient
-        .from('profiles')
-        .select('id, email, role')
-        .eq('id', userId)
-        .single();
-
-      if (profileError || !userProfile) {
-        logger.error('Failed to find user profile', { userId, error: profileError });
-        throw AppError.forbidden('Not authorized to complete this appointment');
-      }
-
-      // Check if user is a dentist (from dentists table or user_roles)
+      // For dentist portal authentication, userId is the dentistId from the dentists table
+      // First, try to find the dentist by ID
       const { data: dentistRecord } = await supabaseClient
         .from('dentists')
         .select('id, email')
         .eq('id', userId)
         .maybeSingle();
 
-      const { data: userRole } = await supabaseClient
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
+      let userEmail: string | null = null;
+      let isDentist = false;
+      let isAdmin = false;
 
-      const isDentist = !!dentistRecord || userRole?.role === 'dentist' || userProfile.role === 'dentist';
-      const isAdmin = userRole?.role === 'admin' || userProfile.role === 'admin';
+      if (dentistRecord) {
+        // This is a dentist from the dentists table
+        userEmail = dentistRecord.email;
+        isDentist = true;
+      } else {
+        // Try to find in profiles table (for Supabase auth users)
+        const { data: userProfile, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('id, email, role')
+          .eq('id', userId)
+          .maybeSingle();
 
-      // Check if user is the dentist for this appointment (by email or ID)
-      const isAuthorized = isAdmin || 
-                          (isDentist && (userProfile.email === existing.dentist_email || 
-                                       existing.dentist_id === userId ||
-                                       dentistRecord?.email === existing.dentist_email));
+        if (!profileError && userProfile) {
+          userEmail = userProfile.email;
+          isDentist = userProfile.role === 'dentist';
+          isAdmin = userProfile.role === 'admin';
+        }
+
+        // Also check user_roles table
+        const { data: userRole } = await supabaseClient
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (userRole) {
+          isDentist = isDentist || userRole.role === 'dentist';
+          isAdmin = isAdmin || userRole.role === 'admin';
+        }
+      }
+
+      if (!userEmail) {
+        logger.error('Failed to find user email', { userId });
+        throw AppError.forbidden('Not authorized to complete this appointment');
+      }
+
+      // Check if user is the dentist for this appointment
+      // Match by email (most reliable) or by ID
+      const isAuthorized = isAdmin ||
+        (isDentist && (
+          userEmail === existing.dentist_email ||
+          existing.dentist_id === userId ||
+          (dentistRecord && dentistRecord.email === existing.dentist_email)
+        ));
 
       if (!isAuthorized) {
         logger.warn('Unauthorized attempt to mark appointment complete', {
           userId,
-          userEmail: userProfile.email,
+          userEmail,
           appointmentId: id,
           dentistEmail: existing.dentist_email,
           dentistId: existing.dentist_id,
@@ -410,11 +519,12 @@ export class AppointmentsService {
       const updated = await appointmentsRepository.update(id, {
         status: 'completed',
         completed_at: new Date().toISOString(),
-      });
+      } as any);
 
       logger.info('Appointment marked as completed', {
         appointmentId: id,
         userId,
+        userEmail,
         dentistEmail: existing.dentist_email,
       });
 
@@ -452,7 +562,7 @@ export class AppointmentsService {
       const appointmentDate = new Date(newDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       if (appointmentDate < today) {
         throw AppError.validation('Appointment date cannot be in the past');
       }

@@ -232,8 +232,8 @@ const DentistProfile = () => {
         <div className="mt-10">
           <DentistReviews 
             dentistName={dentist.name}
-            averageRating={dentist.rating || 4.9}
-            totalReviews={dentist.reviews || 24}
+            averageRating={dentist.rating || 4.5}
+            totalReviews={dentist.reviews || 6}
           />
         </div>
 

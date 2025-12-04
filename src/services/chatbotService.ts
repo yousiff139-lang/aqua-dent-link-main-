@@ -6,6 +6,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { chatbotRealtimeSync } from '@/services/chatbotRealtimeSync';
+import { extractPatientInfo, getMissingInfo } from './aiService';
 import {
   ChatSession,
   ConversationState,
@@ -16,6 +17,7 @@ import {
   SYMPTOM_SPECIALIZATION_MAP,
   INTENT_KEYWORDS,
   TimeSlot,
+  ConversationContext,
 } from '@/types/chatbot';
 import { generateAppointmentPDF, pdfToBlob } from './pdfGenerator';
 import { searchDentalKnowledge, isDentalQuestion } from './dentalKnowledge';
@@ -104,7 +106,7 @@ export class ChatbotService {
   async startConversation(userId?: string): Promise<ChatbotResponse> {
     // Generate a guest session ID if no userId provided
     const sessionId = userId || `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Try to fetch patient data from Supabase if userId is provided
     let patient = null;
     if (userId) {
@@ -121,7 +123,7 @@ export class ChatbotService {
 
     // Extract first name for personalized greeting
     const firstName = patient?.full_name?.split(' ')[0] || 'there';
-    
+
     // Create new session with pre-filled patient data (if available)
     const session: ChatSession = {
       userId: sessionId,
@@ -139,36 +141,212 @@ export class ChatbotService {
     activeSessions.set(sessionId, session);
 
     // Personalized greeting with patient's first name (or generic for guests)
-    const greeting = patient?.full_name 
+    const greeting = patient?.full_name
       ? `Hi ${firstName}! Welcome back to DentalCareConnect 👋`
       : `Hello! Welcome to DentalCareConnect 👋`;
 
     return {
-      message: `${greeting}\n\nI'm your virtual dental assistant. How can I help you today?\n\n• Book an Appointment\n• Ask a Question About Dentistry\n• View Available Dentists`,
+      message: `${greeting}\n\nI'm your virtual dental assistant. How can I help you today?\n\n1️⃣ Book an Appointment\n2️⃣ Ask a General Dentistry Question`,
       state: ConversationState.AWAITING_INTENT,
-      options: ['Book an Appointment', 'Ask a Question', 'View Available Dentists'],
+      options: ['Book Appointment', 'Ask Question'],
       requiresInput: true,
     };
   }
 
   /**
-   * Handle user input and progress conversation
-   * Supports both authenticated and guest users
-   * @param userId - The user's ID or session ID (optional for guest users)
-   * @param message - User's message
+   * Handle user input with AI-powered natural language understanding
+   * @param userId - The user's ID or session ID
+   * @param message - User's message (can be natural language)
    * @returns Chatbot response
    */
   async handleUserInput(userId: string, message: string): Promise<ChatbotResponse> {
-    // Get or create session
     let session = activeSessions.get(userId);
-    
+
     if (!session) {
       return await this.startConversation(userId);
     }
 
     session.updatedAt = new Date();
 
-    // Process based on current state
+    // Check for explicit intent first (especially for Q&A)
+    // This prevents the "Guided AI Flow" from hijacking Q&A requests
+    const intent = this.detectIntent(message);
+    if (intent === UserIntent.ASK_QUESTION) {
+      return await this.handleQuestion(session, message);
+    }
+    if (intent === UserIntent.BACK_TO_MENU) {
+      return await this.startConversation(userId);
+    }
+
+    // If we are waiting for a question, route directly to Q&A handler
+    if (session.currentState === ConversationState.AWAITING_QUESTION) {
+      return await this.handleQuestion(session, message);
+    }
+
+    // If in specific state-based flow, use standard handlers (more reliable)
+    if (
+      session.currentState === ConversationState.AWAITING_GENDER ||
+      session.currentState === ConversationState.AWAITING_PREGNANCY ||
+      session.currentState === ConversationState.AWAITING_PHONE ||
+      session.currentState === ConversationState.AWAITING_NAME ||
+      session.currentState === ConversationState.AWAITING_EMAIL ||
+      session.currentState === ConversationState.AWAITING_SYMPTOM ||
+      session.currentState === ConversationState.AWAITING_MEDICAL_HISTORY ||
+      session.currentState === ConversationState.AWAITING_DOCUMENTS ||
+      session.currentState === ConversationState.AWAITING_CHRONIC_DISEASES ||
+      session.currentState === ConversationState.AWAITING_DENTIST_CONFIRMATION ||
+      session.currentState === ConversationState.AWAITING_DATE_TIME ||
+      session.currentState === ConversationState.AWAITING_PAYMENT_METHOD ||
+      session.currentState === ConversationState.AWAITING_FINAL_CONFIRMATION
+    ) {
+      console.log('📍 Using state-based handler for:', session.currentState);
+      return this.handleUserInputFallback(session, message);
+    }
+
+    // **GUIDED AI FLOW** - Specific order but natural language (only for initial intent detection)
+    console.log('🤖 Guided AI Flow - Processing:', message);
+
+    try {
+      // Determine current step in the flow
+      const currentStep = this.getCurrentFlowStep(session.context);
+      console.log('📍 Current Step:', currentStep);
+
+      // Use AI to extract info and get next question
+      const extracted = await extractPatientInfo(message, session.context, currentStep);
+      console.log('🤖 AI Response:', extracted);
+
+      // Update context with extracted information
+      if (extracted.gender) session.context.gender = extracted.gender;
+      if (extracted.isPregnant !== null) session.context.isPregnant = extracted.isPregnant;
+      if (extracted.phone) session.context.patientPhone = extracted.phone;
+      if (extracted.symptoms) session.context.symptom = extracted.symptoms;
+      if (extracted.chronicDiseases) session.context.chronicDiseases = extracted.chronicDiseases;
+      if (extracted.medicalHistory) session.context.medicalHistory = extracted.medicalHistory;
+      if (extracted.wantsDocuments !== null) session.context.wantsDocuments = extracted.wantsDocuments;
+
+      // Get next step
+      const nextStep = this.getCurrentFlowStep(session.context);
+      console.log('➡️ Next Step:', nextStep);
+
+      // If all info collected, suggest dentist
+      if (nextStep === 'complete' && session.context.symptom) {
+        return await this.suggestDentistFromContext(session);
+      }
+
+      // Map next step to proper conversation state
+      const stateMap: Record<string, ConversationState> = {
+        'gender': ConversationState.AWAITING_GENDER,
+        'pregnancy': ConversationState.AWAITING_PREGNANCY,
+        'phone': ConversationState.AWAITING_PHONE,
+        'symptoms': ConversationState.AWAITING_SYMPTOM,
+        'chronic_diseases': ConversationState.AWAITING_CHRONIC_DISEASES,
+        'medical_history': ConversationState.AWAITING_MEDICAL_HISTORY,
+        'documents': ConversationState.AWAITING_DOCUMENTS,
+      };
+
+      const nextState = stateMap[nextStep] || ConversationState.AWAITING_INTENT;
+
+      // Return AI-generated next question
+      const response = {
+        message: extracted.nextQuestion || this.getDefaultQuestion(nextStep),
+        state: nextState,
+        requiresInput: true,
+      };
+
+      session.currentState = nextState;
+      activeSessions.set(userId, session);
+      console.log('✅ State updated to:', nextState, 'Context:', session.context);
+      return response;
+
+    } catch (error) {
+      console.error('🔴 Error in Guided AI Flow:', error);
+      return this.handleUserInputFallback(session, message);
+    }
+  }
+
+  /**
+   * Determine current step in the guided flow
+   */
+  private getCurrentFlowStep(context: ConversationContext): string {
+    if (!context.gender) return 'gender';
+    if (context.gender === 'female' && context.isPregnant === undefined) return 'pregnancy';
+    if (!context.patientPhone) return 'phone';
+    if (!context.symptom) return 'symptoms';
+    if (!context.chronicDiseases) return 'chronic_diseases';
+    if (!context.medicalHistory) return 'medical_history';
+    if (context.wantsDocuments === undefined) return 'documents';
+    return 'complete';
+  }
+
+  /**
+   * Get default question for each step (fallback)
+   */
+  private getDefaultQuestion(step: string): string {
+    switch (step) {
+      case 'gender':
+        return "To provide the best care, could you tell me your gender?\n\n• Male\n• Female";
+      case 'pregnancy':
+        return "One important question: Are you currently pregnant?\n\n• Yes\n• No";
+      case 'phone':
+        return "What's the best phone number to reach you for appointment confirmations?";
+      case 'symptoms':
+        return "What dental concern brings you in today? Please describe your symptoms.";
+      case 'chronic_diseases':
+        return "**Important:** Do you have any chronic conditions?\n\n• Diabetes\n• High blood pressure\n• Heart disease\n• Other (please specify)\n• None";
+      case 'medical_history':
+        return "Do you have medical history from previous dental visits? (This is optional - type 'skip' if you don't have any)";
+      case 'documents':
+        return "Would you like to upload documents like X-rays or previous reports?\n\n• Yes\n• No / Skip";
+      default:
+        return "How can I help you today?";
+    }
+  }
+
+  /**
+   * Suggest dentist after all info is collected
+   */
+  private async suggestDentistFromContext(session: ChatSession): Promise<ChatbotResponse> {
+    console.log('✅ All info collected! Suggesting dentist...');
+
+    const specialization = this.detectSpecialization(session.context.symptom!);
+    session.context.specialization = specialization;
+
+    const dentist = await this.suggestDentist(specialization);
+
+    if (!dentist) {
+      return {
+        message: "I apologize, but we don't have any available dentists at the moment. Would you like to try again later?",
+        state: ConversationState.AWAITING_INTENT,
+        requiresInput: true,
+      };
+    }
+
+    session.context.suggestedDentist = dentist;
+    const nextSlot = dentist.availability.find(slot => slot.available);
+    const slotInfo = nextSlot ? `${nextSlot.date} at ${nextSlot.time}` : 'soon';
+
+    let messagePrefix = "";
+    if (session.context.wantsDocuments) {
+      messagePrefix = "I've noted that you have documents to upload. You'll receive a secure upload link in your confirmation email.\n\n";
+    }
+
+    const response = {
+      message: `${messagePrefix}Perfect! Based on your symptoms, I recommend:\n\n👨‍⚕️ **${dentist.name}**\n🏥 ${dentist.specialization}\n⭐ Rating: ${dentist.rating}/5.0\n📅 Available: ${slotInfo}\n\nWould you like to book with ${dentist.name}?`,
+      state: ConversationState.AWAITING_DENTIST_CONFIRMATION,
+      suggestedDentist: dentist,
+      options: ['Yes, book with this dentist', 'Choose another dentist'],
+      requiresInput: true,
+    };
+
+    session.currentState = response.state;
+    activeSessions.set(session.userId, session);
+    return response;
+  }
+
+  /**
+   * Fallback to state machine if AI fails
+   */
+  private async handleUserInputFallback(session: ChatSession, message: string): Promise<ChatbotResponse> {
     let response: ChatbotResponse;
 
     switch (session.currentState) {
@@ -189,8 +367,28 @@ export class ChatbotService {
         response = await this.handlePhoneInput(session, message);
         break;
 
+      case ConversationState.AWAITING_GENDER:
+        response = await this.handleGender(session, message);
+        break;
+
+      case ConversationState.AWAITING_PREGNANCY:
+        response = await this.handlePregnancy(session, message);
+        break;
+
       case ConversationState.AWAITING_SYMPTOM:
         response = await this.handleSymptomInput(session, message);
+        break;
+
+      case ConversationState.AWAITING_MEDICAL_HISTORY:
+        response = await this.handleMedicalHistory(session, message);
+        break;
+
+      case ConversationState.AWAITING_DOCUMENTS:
+        response = await this.handleDocumentUpload(session, message);
+        break;
+
+      case ConversationState.AWAITING_CHRONIC_DISEASES:
+        response = await this.handleChronicDiseases(session, message);
         break;
 
       case ConversationState.AWAITING_DENTIST_CONFIRMATION:
@@ -223,7 +421,7 @@ export class ChatbotService {
     }
 
     session.currentState = response.state;
-    activeSessions.set(userId, session);
+    activeSessions.set(session.userId, session);
 
     return response;
   }
@@ -242,7 +440,7 @@ export class ChatbotService {
     switch (intent) {
       case UserIntent.BOOK_APPOINTMENT:
         const { data: { user } } = await supabase.auth.getUser();
-        
+
         if (!user) {
           return {
             message: "To book an appointment, please sign in first.",
@@ -288,12 +486,13 @@ export class ChatbotService {
         session.context.patientEmail = patientEmail;
         session.context.patientPhone = patientPhone;
 
-        // If we have name and email, skip collection - go straight to symptom
+        // If we have name and email, ask for gender first
         if (patientName && patientEmail) {
           const firstName = patientName.split(' ')[0];
           return {
-            message: `Perfect, ${firstName}! I have your details on file.\n\n📧 Email: ${patientEmail}\n${patientPhone ? `📞 Phone: ${patientPhone}` : '📞 Phone: (not provided - we\'ll ask for it if needed)'}\n\nNow, could you describe your dental concern or symptom?\n\nFor example:\n• Tooth pain\n• Gum bleeding\n• Need braces\n• Wisdom teeth removal`,
-            state: ConversationState.AWAITING_SYMPTOM,
+            message: `Perfect, ${firstName}! I have your details on file.\n\n📧 Email: ${patientEmail}\n${patientPhone ? `📞 Phone: ${patientPhone}` : '📞 Phone: (we\'ll ask for it shortly)'}\n\nBefore we proceed, could you please tell me your gender?\n\n• Male\n• Female`,
+            state: ConversationState.AWAITING_GENDER,
+            options: ['Male', 'Female'],
             requiresInput: true,
           };
         }
@@ -324,14 +523,14 @@ export class ChatbotService {
           requiresInput: true,
         };
 
-      case UserIntent.VIEW_DENTISTS:
-        return await this.viewAvailableDentists(session);
+      // case UserIntent.VIEW_DENTISTS:
+      //   return await this.viewAvailableDentists(session);
 
       default:
         return {
-          message: "I'm not sure I understood that. Would you like to:\n\n• Book an appointment\n• Ask a question\n• Check your appointments",
+          message: "I'm not sure I understood that. Would you like to:\n\n• Book an appointment\n• Ask a question",
           state: ConversationState.AWAITING_INTENT,
-          options: ['Book Appointment', 'Ask Question', 'Check Appointment'],
+          options: ['Book Appointment', 'Ask Question'],
           requiresInput: true,
         };
     }
@@ -364,7 +563,30 @@ export class ChatbotService {
   }
 
   private async handlePhoneInput(session: ChatSession, message: string): Promise<ChatbotResponse> {
-    session.context.patientPhone = message.trim();
+    const phone = message.trim();
+
+    // Validate phone number format (digits only, 10-15 digits)
+    const phoneDigits = phone.replace(/\D/g, ''); // Remove non-digits
+
+    if (phoneDigits.length < 10) {
+      return {
+        message: "Please enter a valid phone number with at least 10 digits:",
+        state: ConversationState.AWAITING_PHONE,
+        requiresInput: true,
+      };
+    }
+
+    if (phoneDigits.length > 15) {
+      return {
+        message: "Phone number seems too long. Please enter a valid phone number (10-15 digits):",
+        state: ConversationState.AWAITING_PHONE,
+        requiresInput: true,
+      };
+    }
+
+    // Save the phone number
+    session.context.patientPhone = phone;
+
     return {
       message: "Perfect! Now, could you describe your dental concern or symptom?",
       state: ConversationState.AWAITING_SYMPTOM,
@@ -372,19 +594,237 @@ export class ChatbotService {
     };
   }
 
+  private async handleGender(session: ChatSession, message: string): Promise<ChatbotResponse> {
+    const gender = message.toLowerCase().trim();
+
+    console.log('🔵 Gender input received:', message);
+    console.log('🔵 Current context before:', JSON.stringify(session.context));
+
+    if ((gender.includes('male') && !gender.includes('female')) || gender === 'm' || gender === 'man' || gender === 'boy') {
+      session.context.gender = 'male';
+      console.log('🔵 Gender set to: male');
+    } else if (gender.includes('female') || gender === 'f' || gender === 'woman' || gender === 'girl') {
+      session.context.gender = 'female';
+      console.log('🔵 Gender set to: female');
+    } else {
+      // Invalid input - ask again
+      return {
+        message: "Please select your gender:\n\n• Male\n• Female",
+        state: ConversationState.AWAITING_GENDER,
+        options: ['Male', 'Female'],
+        requiresInput: true,
+      };
+    }
+
+    // CRITICAL: Update session state and save it immediately
+    const nextState = session.context.gender === 'female'
+      ? ConversationState.AWAITING_PREGNANCY
+      : (!session.context.patientPhone ? ConversationState.AWAITING_PHONE : ConversationState.AWAITING_SYMPTOM);
+
+    session.currentState = nextState;
+    // Save updated session immediately
+    activeSessions.set(session.userId, session);
+    console.log('🔵 Context after gender set:', JSON.stringify(session.context));
+    console.log('🔵 State updated to:', nextState);
+
+    // CRITICAL: If female, MUST ask about pregnancy
+    if (session.context.gender === 'female') {
+      console.log('🔵 ASKING PREGNANCY QUESTION for female patient');
+      return {
+        message: "Thank you! One important question: Are you currently pregnant?\n\n• Yes\n• No",
+        state: ConversationState.AWAITING_PREGNANCY,
+        options: ['Yes', 'No'],
+        requiresInput: true,
+      };
+    }
+
+    // If male, check if phone is missing
+    console.log('🔵 Male patient - checking phone');
+    if (!session.context.patientPhone) {
+      return {
+        message: "Thank you! Before we continue, I'll need your phone number for appointment confirmations:",
+        state: ConversationState.AWAITING_PHONE,
+        requiresInput: true,
+      };
+    }
+
+    // If male and phone exists, go to symptoms
+    return {
+      message: "Thank you! Now, could you describe your dental concern or symptom?\n\nFor example:\n• Tooth pain\n• Gum bleeding\n• Need braces\n• Wisdom teeth removal",
+      state: ConversationState.AWAITING_SYMPTOM,
+      requiresInput: true,
+    };
+  }
+
+  private async handlePregnancy(session: ChatSession, message: string): Promise<ChatbotResponse> {
+    const response = message.toLowerCase().trim();
+
+    if (response.includes('yes') || response === 'y' || response.includes('pregnant')) {
+      session.context.isPregnant = true;
+    } else if (response.includes('no') || response === 'n' || response.includes('not')) {
+      session.context.isPregnant = false;
+    } else {
+      return {
+        message: "I didn't quite catch that. Are you currently pregnant?\n\n• Yes\n• No",
+        state: ConversationState.AWAITING_PREGNANCY,
+        options: ['Yes', 'No'],
+        requiresInput: true,
+      };
+    }
+
+    // Check if phone number is missing
+    if (!session.context.patientPhone) {
+      return {
+        message: "Thank you for letting me know! Before we continue, I'll need your phone number for appointment confirmations:",
+        state: ConversationState.AWAITING_PHONE,
+        requiresInput: true,
+      };
+    }
+
+    // If phone exists, go to symptoms
+    return {
+      message: "Thank you for letting me know! Now, could you describe your dental concern or symptom?\n\nFor example:\n• Tooth pain\n• Gum bleeding\n• Need braces\n• Wisdom teeth removal",
+      state: ConversationState.AWAITING_SYMPTOM,
+      requiresInput: true,
+    };
+  }
+
+  private async handleMedicalHistory(session: ChatSession, message: string): Promise<ChatbotResponse> {
+    const response = message.toLowerCase().trim();
+
+    // Option 1: Skip
+    if (response.includes('skip') || response.includes('no') || response.includes('none')) {
+      // User has no medical history - proceed to chronic diseases
+      return {
+        message: "**Important:** Do you have any chronic conditions such as:\n• Diabetes\n• High blood pressure\n• Heart disease\n• Other chronic conditions\n\nPlease list them, or type 'none' if you don't have any:",
+        state: ConversationState.AWAITING_CHRONIC_DISEASES,
+        requiresInput: true,
+      };
+    }
+
+    // Option 2: Upload Documents
+    if (response.includes('upload') || response.includes('document')) {
+      // Enable file upload and ask user to upload
+      return {
+        message: "Great! Please use the **upload button** (📎) next to the message box to upload your documents.\n\nYou can upload:\n• X-rays\n• Previous dental reports\n• Medical records\n• Prescriptions\n\nSupported formats: PDF, JPG, PNG\n\nClick 'Done' when finished uploading, or type your medical history if you prefer.",
+        state: ConversationState.AWAITING_MEDICAL_HISTORY,
+        options: ['Done uploading'],
+        requiresInput: true,
+        showFileUpload: true, // Enable the upload button
+      };
+    }
+
+    // Option 3: User is providing text medical history
+    // If they typed something else (not skip, not upload), treat it as medical history text
+    session.context.medicalHistory = message.trim();
+
+    // Proceed to chronic diseases
+    return {
+      message: "**Important:** Do you have any chronic conditions such as:\n• Diabetes\n• High blood pressure\n• Heart disease\n• Other chronic conditions\n\nPlease list them, or type 'none' if you don't have any:",
+      state: ConversationState.AWAITING_CHRONIC_DISEASES,
+      requiresInput: true,
+    };
+  }
+
+  private async handleDocumentUpload(session: ChatSession, message: string): Promise<ChatbotResponse> {
+    const lowerMessage = message.toLowerCase().trim();
+
+    // Check if message contains uploaded file URLs
+    if (message.includes('[Uploaded Files]:')) {
+      session.context.wantsDocuments = true;
+
+      // Extract URLs
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const urls = message.match(urlRegex) || [];
+      session.context.documentUrls = urls;
+
+      session.currentState = ConversationState.AWAITING_PAYMENT_METHOD;
+      activeSessions.set(session.userId, session);
+      return {
+        message: "Documents received! 📄\n\nNow, how would you like to pay for your visit?\n\n• Cash\n• Card",
+        state: ConversationState.AWAITING_PAYMENT_METHOD,
+        options: ['Cash', 'Card'],
+        requiresInput: true,
+      };
+    }
+
+    if (lowerMessage.includes('skip') || lowerMessage.includes('no') || lowerMessage.includes('done')) {
+      // Store that user skipped or finished uploading
+      session.context.wantsDocuments = false;
+      session.currentState = ConversationState.AWAITING_PAYMENT_METHOD;
+      activeSessions.set(session.userId, session);
+      return {
+        message: "No problem! Now, how would you like to pay?\n\n• Cash\n• Card",
+        state: ConversationState.AWAITING_PAYMENT_METHOD,
+        options: ['Cash', 'Card'],
+        requiresInput: true,
+      };
+    }
+
+    if (lowerMessage.includes('yes') || lowerMessage.includes('upload')) {
+      session.context.wantsDocuments = true;
+      session.currentState = ConversationState.AWAITING_DOCUMENTS;
+      activeSessions.set(session.userId, session);
+      return {
+        message: "Great! Please upload your documents (X-rays, reports, etc.). You can upload multiple files.\n\nSupported formats: PDF, JPG, PNG\n\nClick the upload button below, then click 'Done' when finished.",
+        state: ConversationState.AWAITING_DOCUMENTS,
+        options: ['Done', 'Skip'],
+        requiresInput: true,
+        showFileUpload: true,
+      };
+    }
+
+    return {
+      message: "Would you like to upload documents (X-rays, medical reports, etc.)?\n\n• Yes, upload documents\n• Skip",
+      state: ConversationState.AWAITING_DOCUMENTS,
+      options: ['Yes, upload documents', 'Skip'],
+      requiresInput: true,
+    };
+  }
+
+  private async handleChronicDiseases(session: ChatSession, message: string): Promise<ChatbotResponse> {
+    const response = message.toLowerCase().trim();
+
+    if (!response.includes('none') && !response.includes('no')) {
+      session.context.chronicDiseases = message.trim();
+    }
+
+    // NOW suggest the dentist based on symptoms
+    const dentist = session.context.suggestedDentist;
+
+    if (!dentist) {
+      return {
+        message: "I'm having trouble finding a suitable dentist. Let's start over.",
+        state: ConversationState.GREETING,
+        requiresInput: true,
+      };
+    }
+
+    const nextSlot = dentist.availability.find(slot => slot.available);
+    const slotInfo = nextSlot ? `${nextSlot.date} at ${nextSlot.time}` : 'soon';
+
+    return {
+      message: `Based on your symptoms, **${dentist.name}** (${dentist.specialization}) is recommended.\n\n👨‍⚕️ **${dentist.name}**\n⭐ Rating: ${dentist.rating}/5.0\n📅 Available: ${slotInfo}\n\nWould you like to book with this dentist?`,
+      state: ConversationState.AWAITING_DENTIST_CONFIRMATION,
+      suggestedDentist: dentist,
+      options: ['Yes, book with this dentist', 'Choose another dentist'],
+      requiresInput: true,
+    };
+  }
+
   private async handleSymptomInput(session: ChatSession, message: string): Promise<ChatbotResponse> {
     const lowerMessage = message.toLowerCase().trim();
-    
+
     // Handle "I don't know" or uncertainty
-    if (lowerMessage.includes("don't know") || lowerMessage.includes("don't know") || 
-        lowerMessage === "unknown" || lowerMessage.includes("not sure") || 
-        lowerMessage.includes("unsure")) {
+    if (lowerMessage.includes("don't know") || lowerMessage.includes("don't know") ||
+      lowerMessage === "unknown" || lowerMessage.includes("not sure") ||
+      lowerMessage.includes("unsure")) {
       session.context.symptom = "unknown";
       session.context.specialization = DentalSpecialization.GENERAL;
-      
+
       // Find any available dentist (general or first available)
       const dentist = await this.suggestDentist(DentalSpecialization.GENERAL);
-      
+
       if (!dentist) {
         return {
           message: "No problem! I've noted that you're not sure about your symptoms. Would you like to book with a general dentist who can help diagnose your issue?",
@@ -394,7 +834,7 @@ export class ChatbotService {
       }
 
       session.context.suggestedDentist = dentist;
-      
+
       return {
         message: "No problem! I've noted that you're not sure about your symptoms.\n\nBased on this, I'd suggest:\n\n👨‍⚕️ **Dr. " + dentist.name.split(' ').pop() + "** (General Dentist)\n⭐ Rating: " + dentist.rating + "/5.0\n\nA general dentist can help diagnose and recommend the right specialist if needed. Would you like to book with this dentist?",
         state: ConversationState.AWAITING_DENTIST_CONFIRMATION,
@@ -431,15 +871,14 @@ export class ChatbotService {
       };
     }
 
+    // Save suggested dentist but DON'T show it yet
     session.context.suggestedDentist = dentist;
-    const nextSlot = dentist.availability.find(slot => slot.available);
-    const slotInfo = nextSlot ? `${nextSlot.date} at ${nextSlot.time}` : 'soon';
 
+    // Ask for medical history first with three clear options
     return {
-      message: `Based on what you said, **${dentist.name}** (${specialization}) seems like the best match.\n\n✨ Here's the recommendation:\n\n👨‍⚕️ **${dentist.name}**\n⭐ Rating: ${dentist.rating}/5.0\n📅 Available: ${slotInfo}\n\nWould you like to book with this dentist or choose another dentist?`,
-      state: ConversationState.AWAITING_DENTIST_CONFIRMATION,
-      suggestedDentist: dentist,
-      options: ['Yes, book with this dentist', 'Choose another dentist'],
+      message: "Thank you! Before I suggest a dentist, do you have any previous dental medical history?\n\nYou can:\n📝 **Type** your medical history details\n📄 **Upload** documentation (X-rays, reports)\n⏭️ **Skip** if you don't have any\n\nWhat would you like to do?",
+      state: ConversationState.AWAITING_MEDICAL_HISTORY,
+      options: ['Skip', 'Upload Documents', 'Provide Details'],
       requiresInput: true,
     };
   }
@@ -449,7 +888,7 @@ export class ChatbotService {
 
     if (response.includes('yes') || response.includes('book')) {
       const dentist = session.context.suggestedDentist;
-      
+
       if (!dentist) {
         return {
           message: "Sorry, I lost track of the dentist. Let's start over.",
@@ -475,7 +914,7 @@ export class ChatbotService {
       if (refreshedAvailability.length > 0) {
         dentist.availability = refreshedAvailability;
       }
-      
+
       // Update session context with refreshed dentist
       session.context.suggestedDentist = dentist;
 
@@ -493,11 +932,11 @@ export class ChatbotService {
       // Format dates nicely (e.g., "Monday, Nov 5, 2024")
       const formatDate = (dateStr: string) => {
         const date = new Date(dateStr);
-        return date.toLocaleDateString('en-US', { 
-          weekday: 'short', 
-          month: 'short', 
+        return date.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
           day: 'numeric',
-          year: 'numeric' 
+          year: 'numeric'
         });
       };
 
@@ -523,20 +962,50 @@ export class ChatbotService {
     const slotNumber = parseInt(message.trim());
     const dentist = session.context.suggestedDentist;
 
-    if (!dentist || isNaN(slotNumber)) {
+    // Format dates nicely
+    const formatDate = (dateStr: string) => {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    };
+
+    if (!dentist) {
       return {
-        message: "Please enter a valid slot number:",
+        message: "Sorry, I lost track of the dentist selection. Let's start over.",
+        state: ConversationState.GREETING,
+        requiresInput: true,
+      };
+    }
+
+    const availableSlots = dentist.availability.filter(slot => slot.available).slice(0, 10);
+
+    // If input is not a number, re-show the slots
+    if (isNaN(slotNumber)) {
+      const slotOptions = availableSlots.map(
+        (slot, idx) => `${idx + 1}. ${formatDate(slot.date)} at ${slot.time}`
+      ).join('\n');
+
+      return {
+        message: `Please select a time slot by typing its number:\n\n${slotOptions}\n\nEnter a number (1-${availableSlots.length}):`,
         state: ConversationState.AWAITING_DATE_TIME,
         requiresInput: true,
       };
     }
 
-    const availableSlots = dentist.availability.filter(slot => slot.available);
     const selectedSlot = availableSlots[slotNumber - 1];
 
+    // If number is out of range, re-show the slots
     if (!selectedSlot) {
+      const slotOptions = availableSlots.map(
+        (slot, idx) => `${idx + 1}. ${formatDate(slot.date)} at ${slot.time}`
+      ).join('\n');
+
       return {
-        message: `Please enter a number between 1 and ${availableSlots.length}:`,
+        message: `Please enter a number between 1 and ${availableSlots.length}:\n\n${slotOptions}\n\nSelect a slot:`,
         state: ConversationState.AWAITING_DATE_TIME,
         requiresInput: true,
       };
@@ -547,7 +1016,7 @@ export class ChatbotService {
 
     // Now ask for payment method
     return {
-      message: `Great! Selected: ${selectedSlot.date} at ${selectedSlot.time}\n\nNow, how would you like to pay?\n\n• Cash\n• Card`,
+      message: `Great! Selected: ${formatDate(selectedSlot.date)} at ${selectedSlot.time}\n\nNow, how would you like to pay?\n\n• Cash\n• Card`,
       state: ConversationState.AWAITING_PAYMENT_METHOD,
       options: ['Cash', 'Card'],
       requiresInput: true,
@@ -601,7 +1070,7 @@ export class ChatbotService {
           .single();
 
         const pdfUrl = appointment?.pdf_summary_url || appointment?.pdf_report_url;
-        const pdfMessage = pdfUrl 
+        const pdfMessage = pdfUrl
           ? `\n\n📄 **PDF Summary Generated!**\nYou can download your appointment summary from the appointment details.`
           : '';
 
@@ -621,7 +1090,7 @@ export class ChatbotService {
       };
     } catch (error) {
       console.error('Error saving appointment:', error);
-      
+
       return {
         message: "I'm sorry, there was an error saving your appointment. Please try again.",
         state: ConversationState.ERROR,
@@ -647,7 +1116,7 @@ export class ChatbotService {
 
         // If no general dentists found or error, get any dentist
         let dentist = generalDentists?.[0];
-        
+
         if (!dentist || generalError) {
           const { data: anyDentist } = await supabase
             .from('dentists')
@@ -688,7 +1157,7 @@ export class ChatbotService {
       };
 
       const searchTerms = specializationMap[specialization] || [specialization.toLowerCase()];
-      
+
       // Build OR condition for matching specialization or specialty
       const orConditions = searchTerms.flatMap(term => [
         `specialty.ilike.%${term}%`,
@@ -779,10 +1248,10 @@ export class ChatbotService {
             for (let i = 1; i <= 7; i++) {
               const date = new Date(today);
               date.setDate(today.getDate() + i);
-              slots.push({ 
-                date: date.toISOString().split('T')[0], 
-                time: item.trim(), 
-                available: true 
+              slots.push({
+                date: date.toISOString().split('T')[0],
+                time: item.trim(),
+                available: true
               });
             }
           }
@@ -807,24 +1276,24 @@ export class ChatbotService {
             const [start, end] = schedule.split('-');
             const startTime = this.parseTimeString(start);
             const endTime = this.parseTimeString(end);
-            
+
             // Generate hourly slots
             let current = startTime;
             while (current < endTime) {
               const timeStr = `${Math.floor(current / 60).toString().padStart(2, '0')}:${(current % 60).toString().padStart(2, '0')}`;
-              slots.push({ 
-                date: date.toISOString().split('T')[0], 
-                time: timeStr, 
-                available: true 
+              slots.push({
+                date: date.toISOString().split('T')[0],
+                time: timeStr,
+                available: true
               });
               current += 60; // Add 1 hour
             }
           } else {
             // Single time slot
-            slots.push({ 
-              date: date.toISOString().split('T')[0], 
-              time: schedule.trim(), 
-              available: true 
+            slots.push({
+              date: date.toISOString().split('T')[0],
+              time: schedule.trim(),
+              available: true
             });
           }
         }
@@ -843,8 +1312,8 @@ export class ChatbotService {
       if (existingAppointments) {
         // Mark slots as unavailable if they conflict with existing appointments
         slots.forEach((slot: TimeSlot) => {
-          const isBooked = existingAppointments.some((apt: any) => 
-            apt.appointment_date === slot.date && 
+          const isBooked = existingAppointments.some((apt: any) =>
+            apt.appointment_date === slot.date &&
             apt.appointment_time === slot.time
           );
           if (isBooked) {
@@ -863,10 +1332,10 @@ export class ChatbotService {
         // Generate multiple times per day
         const times = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
         times.forEach(time => {
-          slots.push({ 
-            date: date.toISOString().split('T')[0], 
-            time: time, 
-            available: true 
+          slots.push({
+            date: date.toISOString().split('T')[0],
+            time: time,
+            available: true
           });
         });
       }
@@ -902,7 +1371,7 @@ export class ChatbotService {
 
       const dentistList = dentists
         .slice(0, 10)
-        .map((dentist: any, idx: number) => 
+        .map((dentist: any, idx: number) =>
           `${idx + 1}. **${dentist.name}** - ${dentist.specialization || dentist.specialty || 'General Dentistry'} (⭐ ${dentist.rating || 'N/A'})`
         )
         .join('\n');
@@ -934,7 +1403,7 @@ export class ChatbotService {
     if (!user) {
       throw new Error('Please sign in to book an appointment. Your conversation will be saved.');
     }
-    
+
     // Validate that session has a valid user ID (not guest ID)
     if (session.userId !== user.id) {
       throw new Error('Session mismatch. Please refresh and try again.');
@@ -949,6 +1418,21 @@ export class ChatbotService {
 
     const bookingReference = this.generateBookingReference();
 
+    // Build patient notes with gender and pregnancy info (since these columns don't exist in appointments table)
+    const patientNotesParts: string[] = [];
+    if (context.gender) {
+      patientNotesParts.push(`Gender: ${context.gender}`);
+    }
+    if (context.isPregnant !== undefined && context.isPregnant) {
+      patientNotesParts.push('Pregnant: Yes');
+    }
+    if (context.chronicDiseases) {
+      patientNotesParts.push(`Chronic Diseases: ${context.chronicDiseases}`);
+    }
+    const combinedNotes = patientNotesParts.length > 0
+      ? patientNotesParts.join(' | ') + (context.medicalHistory ? `\n\nMedical History: ${context.medicalHistory}` : '')
+      : context.medicalHistory || '';
+
     // First, create the appointment
     // @ts-ignore - Some columns will be added by migration
     const { data: appointment, error } = await (supabase as any)
@@ -959,43 +1443,98 @@ export class ChatbotService {
         patient_email: context.patientEmail || user.email || '',
         patient_phone: context.patientPhone || '',
         dentist_id: dentist.id,
+        dentist_name: dentist.name,
         dentist_email: dentist.email,
         appointment_date: context.selectedDate,
         appointment_time: context.selectedTime,
-        time: new Date(`${context.selectedDate}T${context.selectedTime}`).toISOString(),
+        reason: context.symptom || 'Not specified',
         symptoms: context.symptom || 'Not specified',
+        medical_history: combinedNotes || null,
         payment_method: context.paymentMethod || 'cash',
         payment_status: 'pending',
-        status: 'pending',
+        status: 'upcoming', // Changed from 'pending' to match dashboard filter
         booking_reference: bookingReference,
         booking_source: 'chatbot', // Mark as chatbot booking for sync tracking
       })
       .select()
       .single();
 
-      if (error) {
-        throw error;
+    if (error) {
+      console.error('Error creating appointment:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      throw new Error(`Failed to create appointment: ${error.message || error.code || 'Unknown error'}`);
+    }
+
+    // Save health information to appointment_health_info table
+    try {
+      // @ts-ignore - appointment_health_info table will be created by migration
+      const { error: healthError } = await (supabase as any)
+        .from('appointment_health_info')
+        .insert({
+          appointment_id: appointment.id,
+          patient_id: user.id,
+          gender: context.gender,
+          is_pregnant: context.isPregnant || false,
+          phone: context.patientPhone,
+          chronic_diseases: context.chronicDiseases,
+          medical_history: context.medicalHistory,
+          symptoms: context.symptom,
+          suggested_specialty: context.specialization,
+        });
+
+      if (healthError) {
+        console.error('Error saving health info:', healthError);
+        // Don't fail the appointment if health info fails
       }
 
-      // Update chatbot log with appointment ID and mark as completed
-      if (session.userId && !session.userId.startsWith('guest_')) {
-        await logChatbotConversation(
-          session.userId,
-          UserIntent.BOOK_APPOINTMENT,
-          context.symptom,
-          dentist.id,
-          ConversationState.COMPLETED,
-          appointment.id,
-          {
-            payment_method: context.paymentMethod,
-            selected_date: context.selectedDate,
-            selected_time: context.selectedTime,
-            booking_reference: bookingReference,
-          }
-        );
-      }
+      // Save document URLs to medical_documents table if any
+      if (context.documentUrls && context.documentUrls.length > 0) {
+        const documentInserts = context.documentUrls.map(url => {
+          const fileName = url.split('/').pop() || 'uploaded_document';
+          return {
+            appointment_id: appointment.id,
+            patient_id: user.id,
+            file_name: fileName,
+            file_url: url,
+            file_type: fileName.endsWith('.pdf') ? 'pdf' : 'image',
+            file_size: 0, // Unknown size from URL
+          };
+        });
 
-      // Generate PDF summary
+        // @ts-ignore - medical_documents table will be created by migration
+        const { error: docsError } = await (supabase as any)
+          .from('medical_documents')
+          .insert(documentInserts);
+
+        if (docsError) {
+          console.error('Error saving medical documents:', docsError);
+          // Don't fail the appointment if documents fail
+        }
+      }
+    } catch (healthSaveError) {
+      console.error('Error in health info save process:', healthSaveError);
+      // Continue with appointment creation even if health info fails
+    }
+
+    // Update chatbot log with appointment ID and mark as completed
+    if (session.userId && !session.userId.startsWith('guest_')) {
+      await logChatbotConversation(
+        session.userId,
+        UserIntent.BOOK_APPOINTMENT,
+        context.symptom,
+        dentist.id,
+        ConversationState.COMPLETED,
+        appointment.id,
+        {
+          payment_method: context.paymentMethod,
+          selected_date: context.selectedDate,
+          selected_time: context.selectedTime,
+          booking_reference: bookingReference,
+        }
+      );
+    }
+
+    // Generate PDF summary
     let pdfUrl: string | null = null;
     try {
       const pdfData = {
@@ -1006,6 +1545,16 @@ export class ChatbotService {
         appointmentDate: context.selectedDate || '',
         paymentMethod: (context.paymentMethod || 'cash') as 'cash' | 'card',
         bookingReference: bookingReference,
+        // Medical Information
+        gender: context.gender,
+        isPregnant: context.isPregnant,
+        chronicDiseases: context.chronicDiseases,
+        medicalHistory: context.medicalHistory,
+        medications: context.medications,
+        allergies: context.allergies,
+        previousDentalWork: context.previousDentalWork,
+        smoking: context.smoking,
+        documentUrls: context.documentUrls,
       };
 
       const pdfBytes = generateAppointmentPDF(pdfData);
@@ -1013,7 +1562,7 @@ export class ChatbotService {
 
       // Upload to Supabase Storage
       const fileName = `appointment-summary-${appointment.id}-${Date.now()}.pdf`;
-      
+
       // Try appointment-documents bucket first, then appointment-pdfs
       let bucketName = 'appointment-documents';
       let { error: uploadError } = await supabase.storage
@@ -1047,7 +1596,7 @@ export class ChatbotService {
         // @ts-ignore - Some columns will be added by migration
         await (supabase as any)
           .from('appointments')
-          .update({ 
+          .update({
             pdf_summary_url: pdfUrl,
             pdf_report_url: pdfUrl, // Also update legacy field
           })
@@ -1115,7 +1664,7 @@ export class ChatbotService {
     }
 
     const appointmentList = appointments
-      .map((apt: any, idx: number) => 
+      .map((apt: any, idx: number) =>
         `${idx + 1}. **${apt.dentist_name}** - ${apt.appointment_date} at ${apt.appointment_time}\n   📋 ID: ${apt.booking_reference || apt.id}`
       )
       .join('\n\n');
@@ -1133,15 +1682,19 @@ export class ChatbotService {
    * Searches dental knowledge base, if not found suggests booking
    */
   private async handleQuestion(session: ChatSession, message: string): Promise<ChatbotResponse> {
-    // Check if it's a dental-related question
-    if (!isDentalQuestion(message)) {
+    // Step 1: If we are not yet waiting for a question, prompt the user
+    // This handles the initial button click "Ask Question"
+    if (session.currentState !== ConversationState.AWAITING_QUESTION) {
+      session.currentState = ConversationState.AWAITING_QUESTION; // CRITICAL: Update session state
       return {
-        message: "I specialize in dental care questions! Could you ask me something about teeth, gums, or dental health? Or would you like to book an appointment?",
-        state: ConversationState.AWAITING_INTENT,
-        options: ['Book Appointment', 'Ask Dental Question', 'View Dentists'],
+        message: "Sure, I can help with that. What is your question about dentistry?",
+        state: ConversationState.AWAITING_QUESTION,
+        options: ['Back to Menu'],
         requiresInput: true,
       };
     }
+
+    // Step 2: Process the actual question
 
     // Log question intent
     const userId = session.userId.startsWith('guest_') ? undefined : session.userId;
@@ -1157,24 +1710,58 @@ export class ChatbotService {
       );
     }
 
-    // Search dental knowledge base
-    const answer = searchDentalKnowledge(message);
+    // PRIORITY: Use backend API with AI + internet search for accurate, current answers
+    // Local knowledge base is only used as a fallback if API fails
+    try {
+      const response = await fetch('http://localhost:3001/api/chatbot/ask', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question: message,
+          type: 'general'
+        }),
+      });
 
-    if (answer) {
-      // Answer found in knowledge base
-      return {
-        message: answer,
-        state: ConversationState.AWAITING_INTENT,
-        options: ['Book Appointment', 'Ask Another Question', 'Back to Menu'],
-        requiresInput: true,
-      };
+      // Check if response is ok
+      if (!response.ok) {
+        throw new Error(`Backend API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data?.answer) {
+        session.currentState = ConversationState.AWAITING_INTENT;
+        return {
+          message: data.data.answer,
+          state: ConversationState.AWAITING_INTENT,
+          options: ['Book Appointment', 'Back to Menu'],
+          requiresInput: true,
+        };
+      }
+    } catch (error) {
+      console.error('Error calling chatbot API:', error);
+
+      // Fallback: try local knowledge base if API fails
+      const fallbackAnswer = searchDentalKnowledge(message);
+      if (fallbackAnswer) {
+        session.currentState = ConversationState.AWAITING_INTENT;
+        return {
+          message: fallbackAnswer,
+          state: ConversationState.AWAITING_INTENT,
+          options: ['Book Appointment', 'Back to Menu'],
+          requiresInput: true,
+        };
+      }
     }
 
-    // Answer not found - suggest booking
+    // If all else fails, provide a helpful message
+    session.currentState = ConversationState.AWAITING_INTENT;
     return {
-      message: "I couldn't find a reliable answer for that specific question in my knowledge base. Would you like to book an appointment so a dentist can check it personally and provide you with expert advice?",
+      message: "I'm sorry, I couldn't process your question right now. For detailed dental advice, I'd recommend booking an appointment with one of our dentists who can provide personalized guidance. Would you like to book an appointment?",
       state: ConversationState.AWAITING_INTENT,
-      options: ['Yes, Book Appointment', 'Ask Another Question', 'Back to Menu'],
+      options: ['Book Appointment', 'Back to Menu'],
       requiresInput: true,
     };
   }

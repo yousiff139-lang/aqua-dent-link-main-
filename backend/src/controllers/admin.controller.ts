@@ -81,5 +81,46 @@ export const adminController = {
     res.setHeader('Content-Disposition', 'attachment; filename="aqua-dent-analytics.pdf"');
     res.send(pdfBuffer);
   }),
-};
 
+  getDiagnostics: asyncHandler(async (_req: Request, res: Response) => {
+    const diagnostics = await adminService.getDiagnostics();
+    res.json({
+      success: true,
+      data: diagnostics,
+    });
+  }),
+
+  uploadDentistImage: asyncHandler(async (req: Request, res: Response) => {
+    const result = await adminService.uploadDentistImage(req);
+    res.json({
+      success: true,
+      data: result,
+    });
+  }),
+
+  getDentist: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const result = await adminService.getDentist(id);
+    res.json({
+      success: true,
+      ...result,
+    });
+  }),
+
+  updateDentist: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const result = await adminService.updateDentist(id, req.body);
+    res.json({
+      success: true,
+      ...result,
+    });
+  }),
+
+  exportData: asyncHandler(async (_req: Request, res: Response) => {
+    const data = await adminService.getExportData();
+    res.json({
+      success: true,
+      data,
+    });
+  }),
+};

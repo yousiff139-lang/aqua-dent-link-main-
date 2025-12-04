@@ -2,6 +2,7 @@ import { dentistsRepository } from '../repositories/dentists.repository.js';
 import { appointmentsRepository } from '../repositories/appointments.repository.js';
 import { slotReservationsRepository } from '../repositories/slot-reservations.repository.js';
 import { logger } from '../config/logger.js';
+import { supabase } from '../config/supabase.js';
 import { AvailabilitySchedule, TimeSlot, SlotReservation } from '../types/index.js';
 import { AppError } from '../utils/errors.js';
 // Real-time sync is handled by Supabase database triggers automatically
@@ -38,24 +39,63 @@ export class AvailabilityService {
       // Validate schedule format
       this.validateSchedule(schedule);
 
-      // Update availability
-      const updated = await dentistsRepository.updateAvailability(
-        dentistId,
-        schedule
-      );
+      // Convert AvailabilitySchedule to dentist_availability records
+      const dayMapping: { [key: string]: number } = {
+        sunday: 0,
+        monday: 1,
+        tuesday: 2,
+        wednesday: 3,
+        thursday: 4,
+        friday: 5,
+        saturday: 6,
+      };
+
+      // First, delete existing availability for this dentist
+      const { error: deleteError } = await supabase
+        .from('dentist_availability')
+        .delete()
+        .eq('dentist_id', dentistId);
+
+      if (deleteError) throw deleteError;
+
+      // Insert new availability records
+      const availabilityRecords = [];
+
+      for (const [day, timeRange] of Object.entries(schedule)) {
+        if (timeRange && dayMapping.hasOwnProperty(day)) {
+          const [startTime, endTime] = timeRange.split('-');
+
+          availabilityRecords.push({
+            dentist_id: dentistId,
+            day_of_week: dayMapping[day],
+            start_time: startTime + ':00', // Convert "09:00" to "09:00:00"
+            end_time: endTime + ':00',
+            is_available: true,
+            slot_duration_minutes: 30, // Default 30-minute slots
+          });
+        }
+      }
+
+      if (availabilityRecords.length > 0) {
+        const { error: insertError } = await supabase
+          .from('dentist_availability')
+          .insert(availabilityRecords);
+
+        if (insertError) throw insertError;
+      }
 
       logger.info('Availability updated successfully', {
         dentistId,
         userId,
+        recordsCreated: availabilityRecords.length,
       });
 
       // Real-time sync is handled automatically by Supabase database triggers
-      // The trigger broadcasts availability changes to chatbot and patient dashboards
       logger.debug('Availability change will be broadcast via database trigger', {
         dentistId,
       });
 
-      return updated.available_times || {};
+      return schedule;
     } catch (error) {
       if (error instanceof AppError) throw error;
       logger.error('Failed to update availability', {

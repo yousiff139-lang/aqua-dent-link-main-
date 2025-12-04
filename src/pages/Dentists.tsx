@@ -50,11 +50,11 @@ const Dentists = () => {
 
   // Placeholder image for dentists without image_url
   const placeholderImage = "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=800&h=800&fit=crop";
-  
+
   return (
     <div className="min-h-screen">
       <Navbar />
-      
+
       <section className="pt-32 pb-16 bg-gradient-to-b from-secondary to-background">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12 animate-slide-up">
@@ -68,7 +68,7 @@ const Dentists = () => {
               Choose from our team of skilled dentistry students, all supervised by experienced professionals.
             </p>
           </div>
-          
+
           {/* Loading State */}
           {isLoading && (
             <div className="flex flex-col items-center justify-center py-16">
@@ -85,8 +85,8 @@ const Dentists = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   We're having trouble loading the dentist list. Please try again later.
                 </p>
-                <Button 
-                  onClick={() => window.location.reload()} 
+                <Button
+                  onClick={() => window.location.reload()}
                   variant="outline"
                 >
                   Retry
@@ -111,14 +111,14 @@ const Dentists = () => {
           {!isLoading && !error && dentists && dentists.length > 0 && (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {dentists.map((dentist, index) => (
-                <Card 
+                <Card
                   key={dentist.id}
-                  className="gradient-card overflow-hidden border-border/50 hover:shadow-aqua-lg transition-smooth hover:-translate-y-2 group"
+                  className="gradient-card overflow-hidden border-border/50 hover:shadow-aqua-lg transition-smooth hover:-translate-y-2 group flex flex-col h-full"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <div className="relative overflow-hidden aspect-square">
-                    <img 
-                      src={dentist.image_url || placeholderImage} 
+                    <img
+                      src={dentist.image_url || placeholderImage}
                       alt={dentist.name}
                       className="w-full h-full object-cover group-hover:scale-110 transition-smooth"
                       onError={(e) => {
@@ -136,21 +136,24 @@ const Dentists = () => {
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold mb-1">{dentist.name}</h3>
-                    <p className="text-sm text-primary font-medium mb-3">
-                      {dentist.specialization || "General Dentistry"}
-                    </p>
-                    <p className="text-sm text-muted-foreground mb-6 line-clamp-3">
-                      {dentist.bio || "Experienced dental professional dedicated to providing quality care."}
-                    </p>
 
-                    <div className="grid grid-cols-2 gap-3">
+
+                  <div className="p-6 flex flex-col h-full">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold mb-1">{dentist.name}</h3>
+                      <p className="text-sm text-primary font-medium mb-3">
+                        {dentist.specialization || "General Dentistry"}
+                      </p>
+                      <p className="text-sm text-muted-foreground line-clamp-3 mb-0 min-h-[3.75rem]">
+                        {dentist.bio || "Experienced dental professional dedicated to providing quality care."}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t">
                       <Link to={`/dentist/${dentist.id}`}>
                         <Button variant="outline" className="w-full">View Profile</Button>
                       </Link>
-                      <Button 
+                      <Button
                         onClick={() => handleBookAppointment(dentist)}
                         className="w-full gradient-primary text-primary-foreground transition-bounce hover:scale-105"
                       >
@@ -165,7 +168,7 @@ const Dentists = () => {
           )}
         </div>
       </section>
-      
+
       <Footer />
       <ChatbotWidget />
 

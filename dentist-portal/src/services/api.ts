@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { getAuthToken, clearAuthSession } from '@/utils/storage';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
@@ -18,6 +18,17 @@ api.interceptors.request.use(
     const token = getAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      // Debug log for authentication requests
+      if (config.url?.includes('/appointments')) {
+        console.debug('Sending request with auth token:', {
+          url: config.url,
+          method: config.method,
+          hasToken: !!token,
+          tokenLength: token.length,
+        });
+      }
+    } else {
+      console.warn('No auth token found for request:', config.url);
     }
     return config;
   },
@@ -58,7 +69,7 @@ api.interceptors.response.use(
     // Handle other errors
     const responseData = error.response?.data as { message?: string; error?: { message?: string } } | undefined;
     const errorMessage = responseData?.error?.message || responseData?.message || error.message || 'An error occurred';
-    
+
     return Promise.reject({
       message: errorMessage,
       status: error.response?.status,

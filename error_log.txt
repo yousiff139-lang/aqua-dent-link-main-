@@ -1,0 +1,15 @@
+STARTING TEST
+1. Login...
+Login Status: 200
+✅ Token received
+2. Test PUT with dummy ID...
+❌ Update failed: Request failed with status code 404
+Response Status: 404
+Response Data: {
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Appointment not found",
+    "timestamp": "2025-11-23T19:21:53.390Z"
+  }
+}
+>>> ENDING TEST <<<

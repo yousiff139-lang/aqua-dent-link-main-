@@ -313,6 +313,53 @@ export class AdminService {
         throw AppError.internal('Password generation failed');
       }
 
+      // Check if email already exists in profiles or dentists
+      const { data: checkProfile } = await supabase
+        .from('profiles')
+        .select('id, email, role')
+        .eq('email', payload.email)
+        .single();
+
+      if (checkProfile) {
+        throw AppError.conflict(
+          `Email ${payload.email} is already registered. Please use a different email address.`
+        );
+      }
+
+      const { data: existingDentist } = await supabase
+        .from('dentists')
+        .select('id, email')
+        .eq('email', payload.email)
+        .single();
+
+      if (existingDentist) {
+        throw AppError.conflict(
+          `A dentist with email ${payload.email} already exists. Please use a different email address.`
+        );
+      }
+
+      // Pre-creation validation: Check service role key permissions
+      const { testAdminPermissions, validateServiceRoleKey } = await import('../config/supabase.js');
+      const keyValidation = validateServiceRoleKey();
+      if (!keyValidation.valid) {
+        logger.error('Service role key validation failed', { message: keyValidation.message });
+        throw AppError.internal(
+          `Service role key configuration error: ${keyValidation.message}. ` +
+          'Please check your SUPABASE_SERVICE_ROLE_KEY in the backend .env file. ' +
+          'Get the correct key from Supabase Dashboard > Settings > API > service_role key (secret).'
+        );
+      }
+
+      const hasAdminPerms = await testAdminPermissions();
+      if (!hasAdminPerms) {
+        logger.error('Service role key does not have admin permissions');
+        throw AppError.internal(
+          'Service role key does not have admin permissions. ' +
+          'Please verify that SUPABASE_SERVICE_ROLE_KEY in your backend .env file is the correct service_role key from Supabase Dashboard. ' +
+          'The service role key should start with "eyJ" and be different from the anon key.'
+        );
+      }
+
       logger.info('Creating auth user', { email: payload.email, name: payload.name });
 
       // 1. Create the user in Supabase Auth
@@ -327,38 +374,68 @@ export class AdminService {
       });
 
       if (authError) {
-        logger.error('Failed to create auth user', { 
+        // Log full error object for debugging
+        logger.error('Failed to create auth user', {
           error: authError,
+          errorType: authError.constructor?.name,
           message: authError.message,
           status: authError.status,
           code: authError.code,
-          email: payload.email
+          name: (authError as any).name,
+          email: payload.email,
+          fullError: JSON.stringify(authError, Object.getOwnPropertyNames(authError))
         });
-        
+
         // Handle specific error cases
-        if (authError.message?.includes('already registered') || 
-            authError.message?.includes('already exists') ||
-            authError.message?.includes('User already registered')) {
+        if (authError.message?.includes('already registered') ||
+          authError.message?.includes('already exists') ||
+          authError.message?.includes('User already registered')) {
           throw AppError.conflict('Email already registered. Please use a different email address.');
         }
-        
+
         if (authError.message?.includes('Invalid email')) {
           throw AppError.validation('Invalid email address format');
         }
-        
+
         if (authError.message?.includes('Password')) {
           throw AppError.validation('Password does not meet requirements');
         }
 
-        // Check if it's a service role key issue
-        if (authError.message?.includes('JWT') || authError.message?.includes('token') || authError.status === 401) {
-          logger.error('Possible service role key issue', { error: authError });
-          throw AppError.internal('Authentication configuration error. Please check backend service role key.');
+        // Handle unexpected_failure code specifically
+        if (authError.code === 'unexpected_failure' || (authError as any).code === 'unexpected_failure') {
+          logger.error('Unexpected failure when creating user - likely service role key issue', {
+            status: authError.status,
+            code: authError.code,
+            message: authError.message
+          });
+          throw AppError.internal(
+            'Failed to create dentist account: Authentication service error. ' +
+            'This usually means the service role key is invalid or does not have admin permissions. ' +
+            'Please verify SUPABASE_SERVICE_ROLE_KEY in your backend .env file. ' +
+            'Get the correct key from Supabase Dashboard > Settings > API > service_role key (secret). ' +
+            'The key should start with "eyJ" (not "sb_").'
+          );
+        }
+
+        // Check if it's a service role key issue (401, 403, or JWT-related)
+        if (authError.status === 401 || authError.status === 403 ||
+          authError.message?.includes('JWT') ||
+          authError.message?.includes('token') ||
+          authError.message?.includes('unauthorized') ||
+          authError.message?.includes('forbidden')) {
+          logger.error('Service role key authentication issue', { error: authError });
+          throw AppError.internal(
+            'Authentication configuration error: The service role key may be invalid or expired. ' +
+            'Please check SUPABASE_SERVICE_ROLE_KEY in your backend .env file and ensure it is the correct service_role key from Supabase Dashboard.'
+          );
         }
 
         // Generic error with more details
         const errorDetails = authError.message || authError.code || 'Unknown error';
-        throw AppError.internal(`Failed to create dentist account: ${errorDetails}`);
+        throw AppError.internal(
+          `Failed to create dentist account: ${errorDetails}. ` +
+          'If this persists, please check your Supabase service role key configuration.'
+        );
       }
 
       if (!authData.user) {
@@ -370,7 +447,7 @@ export class AdminService {
       // 2. Update Profile (trigger already created it, we just need to set role and other fields)
       //    Give the trigger a moment to complete, then check if profile exists
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // First check if profile exists, if not create it
       const { data: existingProfile, error: checkError } = await supabase
         .from('profiles')
@@ -554,6 +631,134 @@ export class AdminService {
       if (error instanceof AppError) throw error;
       logger.error('Unexpected error deleting dentist', { error });
       throw AppError.internal('An unexpected error occurred while deleting the dentist');
+    }
+  }
+
+  async getDentist(dentistId: string) {
+    try {
+      // Fetch dentist with profile data
+      const { data: dentist, error: dentistError } = await supabase
+        .from('dentists')
+        .select('*')
+        .eq('id', dentistId)
+        .single();
+
+      if (dentistError) {
+        if (dentistError.code === 'PGRST116') {
+          throw AppError.notFound(`Dentist with ID ${dentistId} not found`);
+        }
+        logger.error('Failed to fetch dentist', { error: dentistError });
+        throw AppError.internal('Failed to fetch dentist details');
+      }
+
+      // Fetch profile data
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', dentistId)
+        .single();
+
+      return {
+        data: {
+          id: dentist.id,
+          name: dentist.name,
+          email: dentist.email,
+          specialization: dentist.specialization,
+          phone: dentist.phone || profile?.phone || '',
+          status: dentist.status || 'active',
+          years_of_experience: dentist.years_of_experience || 0,
+          education: dentist.education || '',
+          bio: dentist.bio || '',
+          image_url: dentist.image_url || null,
+          profile_picture: dentist.image_url || dentist.profile_picture || null,
+        },
+      };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error('Unexpected error fetching dentist', { error });
+      throw AppError.internal('An unexpected error occurred while fetching the dentist');
+    }
+  }
+
+  async updateDentist(dentistId: string, rawInput: unknown) {
+    try {
+      const updates = rawInput as any;
+
+      // Validate dentist exists
+      const { data: existingDentist, error: checkError } = await supabase
+        .from('dentists')
+        .select('id, email')
+        .eq('id', dentistId)
+        .single();
+
+      if (checkError || !existingDentist) {
+        throw AppError.notFound(`Dentist with ID ${dentistId} not found`);
+      }
+
+      // If email is being changed, check it's not already in use
+      if (updates.email && updates.email !== existingDentist.email) {
+        const { data: emailCheck } = await supabase
+          .from('dentists')
+          .select('id')
+          .eq('email', updates.email)
+          .neq('id', dentistId)
+          .single();
+
+        if (emailCheck) {
+          throw AppError.conflict('Email already in use by another dentist');
+        }
+      }
+
+      // Update dentists table
+      const dentistUpdates: any = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.name) dentistUpdates.name = updates.name;
+      if (updates.email) dentistUpdates.email = updates.email;
+      if (updates.specialization) dentistUpdates.specialization = updates.specialization;
+      if (updates.phone !== undefined) dentistUpdates.phone = updates.phone;
+      if (updates.years_of_experience !== undefined) dentistUpdates.years_of_experience = updates.years_of_experience;
+      if (updates.education !== undefined) dentistUpdates.education = updates.education;
+      if (updates.bio !== undefined) dentistUpdates.bio = updates.bio;
+      if (updates.image_url !== undefined) dentistUpdates.image_url = updates.image_url;
+      if (updates.status) dentistUpdates.status = updates.status;
+
+      const { error: dentistError } = await supabase
+        .from('dentists')
+        .update(dentistUpdates)
+        .eq('id', dentistId);
+
+      if (dentistError) {
+        logger.error('Failed to update dentist', { error: dentistError });
+        throw AppError.internal('Failed to update dentist details');
+      }
+
+      // Update profile table
+      const profileUpdates: any = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.name) profileUpdates.full_name = updates.name;
+      if (updates.email) profileUpdates.email = updates.email;
+      if (updates.phone !== undefined) profileUpdates.phone = updates.phone;
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('id', dentistId);
+
+      if (profileError) {
+        logger.warn('Failed to update profile', { error: profileError });
+        // Don't throw - dentist update succeeded
+      }
+
+      // Fetch updated dentist
+      return await this.getDentist(dentistId);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error('Unexpected error updating dentist', { error });
+      throw AppError.internal('An unexpected error occurred while updating the dentist');
     }
   }
 
@@ -850,6 +1055,180 @@ export class AdminService {
         reject(error);
       }
     });
+  }
+
+  async getDiagnostics() {
+    try {
+      const diagnostics: {
+        serviceRoleKey: { valid: boolean; message?: string };
+        adminPermissions: boolean;
+        createUserCapability: { success: boolean; error?: string };
+        databaseConnection: boolean;
+        recommendations: string[];
+      } = {
+        serviceRoleKey: { valid: false },
+        adminPermissions: false,
+        createUserCapability: { success: false },
+        databaseConnection: false,
+        recommendations: [],
+      };
+
+      // Test service role key format
+      const { validateServiceRoleKey } = await import('../config/supabase.js');
+      diagnostics.serviceRoleKey = validateServiceRoleKey();
+      if (!diagnostics.serviceRoleKey.valid) {
+        diagnostics.recommendations.push(
+          'Fix service role key: Get the correct service_role key from Supabase Dashboard > Settings > API > service_role key (secret). It should start with "eyJ".'
+        );
+      }
+
+      // Test database connection
+      const { testSupabaseConnection } = await import('../config/supabase.js');
+      diagnostics.databaseConnection = await testSupabaseConnection();
+      if (!diagnostics.databaseConnection) {
+        diagnostics.recommendations.push(
+          'Check database connection: Verify SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in backend .env file.'
+        );
+      }
+
+      // Test admin permissions
+      const { testAdminPermissions } = await import('../config/supabase.js');
+      diagnostics.adminPermissions = await testAdminPermissions();
+      if (!diagnostics.adminPermissions) {
+        diagnostics.recommendations.push(
+          'Service role key does not have admin permissions. Verify the key is the service_role key, not the anon key.'
+        );
+      }
+
+      // Test create user capability
+      const { testCreateUserCapability } = await import('../config/supabase.js');
+      diagnostics.createUserCapability = await testCreateUserCapability();
+      if (!diagnostics.createUserCapability.success) {
+        diagnostics.recommendations.push(
+          `Cannot create users: ${diagnostics.createUserCapability.error}. Check Supabase project settings and service role key.`
+        );
+      }
+
+      // Add general recommendations if all checks pass
+      if (diagnostics.serviceRoleKey.valid &&
+        diagnostics.databaseConnection &&
+        diagnostics.adminPermissions &&
+        diagnostics.createUserCapability.success) {
+        diagnostics.recommendations.push('All checks passed! Dentist creation should work correctly.');
+      }
+
+      return diagnostics;
+    } catch (error: any) {
+      logger.error('Error getting diagnostics', { error });
+      throw AppError.internal('Failed to get diagnostics: ' + error.message);
+    }
+  }
+
+  /**
+   * Get all system data for export
+   */
+  async getExportData(): Promise<any> {
+    try {
+      // Fetch all patients
+      const { data: patients, error: patientsError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone, created_at')
+        .eq('role', 'patient')
+        .order('created_at', { ascending: false });
+
+      if (patientsError) {
+        logger.error('Error fetching patients for export', { error: patientsError });
+      }
+
+      // Count appointments per patient
+      const patientsWithCounts = await Promise.all(
+        (patients || []).map(async (patient) => {
+          const { count } = await supabase
+            .from('appointments')
+            .select('*', { count: 'exact', head: true })
+            .eq('patient_id', patient.id);
+          return { ...patient, total_appointments: count || 0 };
+        })
+      );
+
+      // Fetch all dentists
+      const { data: dentists, error: dentistsError } = await supabase
+        .from('dentists')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (dentistsError) {
+        logger.error('Error fetching dentists for export', { error: dentistsError });
+      }
+
+      // Count appointments per dentist
+      const dentistsWithCounts = await Promise.all(
+        (dentists || []).map(async (dentist) => {
+          const { count } = await supabase
+            .from('appointments')
+            .select('*', { count: 'exact', head: true })
+            .eq('dentist_id', dentist.id);
+          return { ...dentist, total_appointments: count || 0 };
+        })
+      );
+
+      // Fetch all appointments
+      const { data: appointments, error: appointmentsError } = await supabase
+        .from('appointments')
+        .select('*')
+        .order('appointment_date', { ascending: false });
+
+      if (appointmentsError) {
+        logger.error('Error fetching appointments for export', { error: appointmentsError });
+      }
+
+      // Calculate summary statistics
+      const totalPatients = patients?.length || 0;
+      const totalDentists = dentists?.length || 0;
+      const totalAppointments = appointments?.length || 0;
+
+      const appointmentsByStatus = appointments?.reduce((acc: any, apt) => {
+        acc[apt.status] = (acc[apt.status] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Calculate revenue (pending payments)
+      const pendingPayments = appointments?.filter((apt) => apt.payment_status === 'pending') || [];
+      const pendingRevenue = pendingPayments.length * 50; // Assuming $50 average
+
+      // Top symptoms
+      const symptomCounts = appointments?.reduce((acc: any, apt) => {
+        const symptom = apt.symptoms || apt.reason || 'Unknown';
+        acc[symptom] = (acc[symptom] || 0) + 1;
+        return acc;
+      }, {});
+
+      const topSymptoms = Object.entries(symptomCounts || {})
+        .map(([symptom, count]) => ({ symptom, count }))
+        .sort((a: any, b: any) => b.count - a.count)
+        .slice(0, 10);
+
+      return {
+        patients: patientsWithCounts,
+        dentists: dentistsWithCounts,
+        appointments,
+        summary: {
+          totalPatients,
+          totalDentists,
+          totalAppointments,
+          ...appointmentsByStatus,
+          pendingAppointments: appointmentsByStatus?.pending || 0,
+          completedAppointments: appointmentsByStatus?.completed || 0,
+          cancelledAppointments: appointmentsByStatus?.cancelled || 0,
+          upcomingAppointments: appointmentsByStatus?.upcoming || 0,
+          pendingRevenue,
+          topSymptoms,
+        },
+      };
+    } catch (error: any) {
+      logger.error('Error getting export data', { error });
+      throw AppError.internal('Failed to get export data: ' + error.message);
+    }
   }
 }
 

@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { AppError } from '../utils/errors.js';
 import { Appointment } from '../types/index.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'dentist-portal-secret-key-change-in-production-2024';
 
 const APPOINTMENT_STATUS_FILTERS = new Set(['pending', 'confirmed', 'upcoming', 'completed', 'cancelled']);
 
@@ -77,8 +77,8 @@ const findDentistByEmail = async (email: string) => {
         .maybeSingle();
 
       if (profileError) {
-        logger.error('Failed to query dentist by email from profiles', { 
-          email: normalizedEmail, 
+        logger.error('Failed to query dentist by email from profiles', {
+          email: normalizedEmail,
           error: profileError,
           errorMessage: profileError.message,
           errorDetails: profileError.details,
@@ -100,8 +100,8 @@ const findDentistByEmail = async (email: string) => {
         };
       }
     } else if (error) {
-      logger.error('Failed to query dentist by email from dentists table', { 
-        email: normalizedEmail, 
+      logger.error('Failed to query dentist by email from dentists table', {
+        email: normalizedEmail,
         error,
         errorMessage: error.message,
         errorDetails: error.details,
@@ -111,7 +111,7 @@ const findDentistByEmail = async (email: string) => {
 
     return data;
   } catch (error: any) {
-    logger.error('Unexpected error in findDentistByEmail', { 
+    logger.error('Unexpected error in findDentistByEmail', {
       email: normalizedEmail,
       error: error.message,
       stack: error.stack,
@@ -126,6 +126,7 @@ const issueDentistToken = (dentist: ReturnType<typeof transformDentistRecord>) =
       dentistId: dentist.id,
       email: dentist.email,
       role: 'dentist',
+      type: 'dentist',
     },
     JWT_SECRET,
     { expiresIn: '24h' }

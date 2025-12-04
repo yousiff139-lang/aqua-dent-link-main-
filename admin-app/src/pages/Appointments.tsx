@@ -70,12 +70,12 @@ export default function Appointments() {
   const loadAppointments = async () => {
     try {
       setLoading(true)
-
+      
       let loaded: Appointment[] | null = null
 
       // 1) Try backend API first
       try {
-        const response = await api.get<{ success: boolean; data: Appointment[] }>('/admin/appointments')
+      const response = await api.get<{ success: boolean; data: Appointment[] }>('/admin/appointments')
         const responseData = response as any
         const apiAppointments = responseData?.data
 

@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from '@/components/Toaster'
-import { 
-  User, Building2, Bell, Brain, Palette, Shield, 
+import {
+  User, Building2, Bell, Brain, Palette, Shield,
   Calendar, Clock, Phone, Download,
   Trash2, LogOut, Save, Check
 } from 'lucide-react'
@@ -18,7 +18,7 @@ interface AppearanceSettings {
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('account')
-  
+
   // Appearance settings state
   const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettings>({
     accentColor: 'blue',
@@ -38,10 +38,10 @@ export default function Settings() {
   // Apply settings to the document
   const applySettings = (settings: AppearanceSettings) => {
     const root = document.documentElement
-    
+
     // Apply accent color
     root.style.setProperty('--accent-color', getColorValue(settings.accentColor))
-    
+
     // Apply font size
     const fontSizes = {
       small: '14px',
@@ -116,11 +116,10 @@ export default function Settings() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${activeTab === tab.id
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100'
+                  }`}
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
@@ -331,6 +330,62 @@ export default function Settings() {
                 </Button>
               </div>
 
+              <div className="border-t pt-6 space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">📊 Data Export & Reports</h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Download comprehensive system reports including patients, dentists, appointments, and statistics in Excel format.
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Download className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-blue-900 mb-1">Complete System Report</h4>
+                      <p className="text-sm text-blue-700 mb-3">Includes:</p>
+                      <ul className="text-sm text-blue-700 space-y-1 ml-4">
+                        <li>• All patients with appointment counts</li>
+                        <li>• All dentists with statistics</li>
+                        <li>• Complete appointment history</li>
+                        <li>• Summary statistics and metrics</li>
+                        <li>• Top symptoms and peak times</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={async () => {
+                    try {
+                      const { exportSystemDataToExcel } = await import('@/services/excelExport')
+
+                      toast({
+                        title: 'Generating Report...',
+                        description: 'Please wait while we prepare your data export.',
+                      })
+
+                      await exportSystemDataToExcel()
+
+                      toast({
+                        title: 'Export Complete!',
+                        description: 'Your Excel file has been downloaded successfully.',
+                      })
+                    } catch (error: any) {
+                      console.error('Export error:', error)
+                      toast({
+                        title: 'Export Failed',
+                        description: error.message || 'Failed to generate export. Please try again.',
+                      })
+                    }
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Complete Report as PDF
+                </Button>
+              </div>
+
               <Button onClick={handleSave} className="w-full">
                 <Save className="w-4 h-4 mr-2" />
                 Save AI & Data Settings
@@ -365,11 +420,10 @@ export default function Settings() {
                     <button
                       key={colorOption.name}
                       onClick={() => updateAppearanceSetting('accentColor', colorOption.name)}
-                      className={`relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all hover:scale-105 ${
-                        appearanceSettings.accentColor === colorOption.name
-                          ? 'border-gray-900 bg-gray-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                      className={`relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all hover:scale-105 ${appearanceSettings.accentColor === colorOption.name
+                        ? 'border-gray-900 bg-gray-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                        }`}
                     >
                       <div className={`w-12 h-12 rounded-full ${colorOption.color} shadow-md flex items-center justify-center`}>
                         {appearanceSettings.accentColor === colorOption.name && (
@@ -395,18 +449,16 @@ export default function Settings() {
                     <button
                       key={sizeOption.value}
                       onClick={() => updateAppearanceSetting('fontSize', sizeOption.value as 'small' | 'medium' | 'large')}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105 ${
-                        appearanceSettings.fontSize === sizeOption.value
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                      className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105 ${appearanceSettings.fontSize === sizeOption.value
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                        }`}
                     >
                       <span
-                        className={`font-bold ${
-                          sizeOption.value === 'small' ? 'text-2xl' : 
-                          sizeOption.value === 'medium' ? 'text-3xl' : 
-                          'text-4xl'
-                        }`}
+                        className={`font-bold ${sizeOption.value === 'small' ? 'text-2xl' :
+                          sizeOption.value === 'medium' ? 'text-3xl' :
+                            'text-4xl'
+                          }`}
                       >
                         {sizeOption.example}
                       </span>
@@ -421,7 +473,7 @@ export default function Settings() {
                 <Label className="text-sm font-semibold text-gray-700 mb-3 block">Preview</Label>
                 <div className="bg-white p-4 rounded-lg shadow-sm space-y-3">
                   <div className="flex items-center gap-3">
-                    <div 
+                    <div
                       className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
                       style={{ backgroundColor: getColorValue(appearanceSettings.accentColor) }}
                     >
@@ -434,7 +486,7 @@ export default function Settings() {
                       <p className="text-gray-500 text-sm">This is how your text will look</p>
                     </div>
                   </div>
-                  <Button 
+                  <Button
                     className="w-full"
                     style={{ backgroundColor: getColorValue(appearanceSettings.accentColor) }}
                   >
@@ -450,8 +502,8 @@ export default function Settings() {
               </Button>
 
               {/* Reset Button */}
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setAppearanceSettings({
                     accentColor: 'blue',
@@ -506,6 +558,6 @@ export default function Settings() {
           </Card>
         )}
       </div>
-    </DashboardLayout>
+    </DashboardLayout >
   )
 }

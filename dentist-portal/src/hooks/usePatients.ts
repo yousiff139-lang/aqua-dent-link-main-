@@ -19,7 +19,19 @@ export const usePatients = (email: string | undefined) => {
       setIsLoading(true);
       setError(null);
       const data = await dentistService.getPatients(email, filters);
-      setAppointments(data);
+      
+      // Group appointments by patient email to show unique patients
+      const uniquePatients = new Map<string, Appointment>();
+      data.forEach((appointment) => {
+        const patientEmail = appointment.patient_email;
+        // Keep the most recent appointment for each patient
+        if (!uniquePatients.has(patientEmail) || 
+            new Date(appointment.appointment_date) > new Date(uniquePatients.get(patientEmail)!.appointment_date)) {
+          uniquePatients.set(patientEmail, appointment);
+        }
+      });
+      
+      setAppointments(Array.from(uniquePatients.values()));
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to load patients';
       setError(errorMessage);

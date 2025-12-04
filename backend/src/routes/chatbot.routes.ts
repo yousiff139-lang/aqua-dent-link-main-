@@ -1,36 +1,22 @@
 import { Router } from 'express';
 import { chatbotController } from '../controllers/chatbot.controller.js';
-import { optionalAuth } from '../middleware/auth.js';
+import { upload } from '../middleware/upload.js';
 
 const router = Router();
 
-/**
- * Chatbot Routes
- * 
- * POST   /api/chatbot/message             - Send message to chatbot (supports guest sessions)
- * GET    /api/chatbot/conversation/:id    - Get conversation history (authenticated)
- * POST   /api/chatbot/generate-pdf        - Generate PDF summary (authenticated)
- * GET    /api/chatbot/available-slots     - Query available slots (public)
- */
+// Start a new conversation
+router.post('/start', chatbotController.startConversation);
 
-// Send message to chatbot (supports guest sessions with session_token)
-router.post('/message', optionalAuth, (req, res, next) =>
-  chatbotController.sendMessage(req, res, next)
-);
+// Send message in conversation
+router.post('/message', chatbotController.sendMessage);
 
-// Get conversation history (authenticated users only)
-router.get('/conversation/:id', (req, res, next) =>
-  chatbotController.getConversation(req, res, next)
-);
+// Get conversation state
+router.get('/conversation/:id', chatbotController.getConversation);
 
-// Generate PDF summary (authenticated users only)
-router.post('/generate-pdf', (req, res, next) =>
-  chatbotController.generatePDF(req, res, next)
-);
+// Ask a quick question (stateless)
+router.post('/ask', chatbotController.askQuestion);
 
-// Get available appointment slots (public endpoint)
-router.get('/available-slots', (req, res, next) =>
-  chatbotController.getAvailableSlots(req, res, next)
-);
+// Upload document
+router.post('/upload', upload.single('file'), chatbotController.uploadDocument);
 
 export { router as chatbotRouter };

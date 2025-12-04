@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send } from 'lucide-react';
+import { MessageCircle, X, Send, Upload, File } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { ChatbotResponse } from '@/types/chatbot';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatbotSync } from '@/services/chatbotRealtimeSync';
 import { logger } from '@/utils/logger';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: string;
@@ -15,6 +16,7 @@ interface Message {
   sender: 'bot' | 'user';
   timestamp: Date;
   options?: string[];
+  showFileUpload?: boolean;
 }
 
 export const ChatbotWidget = () => {
@@ -23,6 +25,9 @@ export const ChatbotWidget = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showFileUpload, setShowFileUpload] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -61,7 +66,7 @@ export const ChatbotWidget = () => {
 
   const handleOpen = async () => {
     setIsOpen(true);
-    
+
     // Start conversation for both authenticated and guest users
     if (messages.length === 0) {
       setIsLoading(true);
@@ -72,7 +77,7 @@ export const ChatbotWidget = () => {
           guestSessionId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           localStorage.setItem('guest_session_id', guestSessionId);
         }
-        
+
         // Pass userId if user is logged in, otherwise undefined for guest session
         const response = await chatbotService.startConversation(user?.id);
         addBotMessage(response);
@@ -96,21 +101,64 @@ export const ChatbotWidget = () => {
       sender: 'bot',
       timestamp: new Date(),
       options: response.options,
+      showFileUpload: response.showFileUpload,
     };
     setMessages(prev => [...prev, botMessage]);
+    // Show file upload UI if needed
+    if (response.showFileUpload) {
+      setShowFileUpload(true);
+    }
   };
 
   const handleSend = async (text?: string) => {
-    const messageText = text || input.trim();
-    
-    if (!messageText) return;
-    
+    let messageText = text || input.trim();
+
+    if (!messageText && uploadedFiles.length === 0) return;
+
     // Generate or get session ID for guest users
     const sessionId = user?.id || `guest_${localStorage.getItem('guest_session_id') || Date.now()}`;
-    
+
     // Store guest session ID in localStorage if not authenticated
     if (!user && !localStorage.getItem('guest_session_id')) {
       localStorage.setItem('guest_session_id', sessionId);
+    }
+
+    // Upload files if any
+    if (uploadedFiles.length > 0) {
+      try {
+        const uploadPromises = uploadedFiles.map(async (file) => {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${sessionId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('medical_documents')
+            .upload(fileName, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('medical_documents')
+            .getPublicUrl(fileName);
+
+          return publicUrl;
+        });
+
+        const urls = await Promise.all(uploadPromises);
+        messageText += `\n\n[Uploaded Files]:\n${urls.join('\n')}`;
+
+        setUploadedFiles([]); // Clear files after upload
+        setShowFileUpload(false); // Hide upload UI
+      } catch (error) {
+        console.error('Error uploading files:', error);
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          text: "Failed to upload files. Please try again.",
+          sender: 'bot',
+          timestamp: new Date(),
+        }]);
+        setIsLoading(false);
+        return;
+      }
     }
 
     // Add user message
@@ -129,7 +177,7 @@ export const ChatbotWidget = () => {
       // Use session ID (user ID if authenticated, guest ID if not)
       const response = await chatbotService.handleUserInput(sessionId, messageText);
       addBotMessage(response);
-      
+
       // If the response indicates authentication is needed for booking
       if (response.state === 'error' && response.message?.includes('sign in')) {
         addBotMessage({
@@ -141,7 +189,7 @@ export const ChatbotWidget = () => {
     } catch (error: any) {
       console.error('Error handling input:', error);
       const errorMessage = error.message || "I'm sorry, something went wrong. Please try again.";
-      
+
       // If it's an authentication error, provide helpful message
       if (errorMessage.includes('sign in') || errorMessage.includes('authenticated')) {
         addBotMessage({
@@ -164,6 +212,43 @@ export const ChatbotWidget = () => {
 
   const handleOptionClick = (option: string) => {
     handleSend(option);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newFiles = Array.from(files);
+
+    // Validate file types
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    const validFiles = newFiles.filter(file => allowedTypes.includes(file.type));
+
+    if (validFiles.length !== newFiles.length) {
+      addBotMessage({
+        message: "Some files were rejected. Only PDF, JPG, and PNG files are allowed.",
+        state: 'error' as any,
+        requiresInput: true,
+      });
+    }
+
+    if (validFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...validFiles]);
+      addBotMessage({
+        message: `✅ ${validFiles.length} file(s) uploaded successfully! You can upload more or continue with your booking.`,
+        state: 'awaiting_medical_history' as any,
+        requiresInput: true,
+      });
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   if (!isOpen) {
@@ -204,14 +289,13 @@ export const ChatbotWidget = () => {
             className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] rounded-lg p-3 ${
-                message.sender === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
-              }`}
+              className={`max-w-[80%] rounded-lg p-3 ${message.sender === 'user'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted'
+                }`}
             >
               <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-              
+
               {/* Quick reply options */}
               {message.options && message.options.length > 0 && (
                 <div className="mt-2 space-y-1">
@@ -229,10 +313,13 @@ export const ChatbotWidget = () => {
                   ))}
                 </div>
               )}
+
+              {/* File upload section */}
+
             </div>
           </div>
         ))}
-        
+
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-muted rounded-lg p-3">
@@ -244,18 +331,53 @@ export const ChatbotWidget = () => {
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t">
+      <div className="border-t">
+        {/* Uploaded Files List */}
+        {uploadedFiles.length > 0 && (
+          <div className="p-3 pb-0 space-y-1 max-h-32 overflow-y-auto">
+            {uploadedFiles.map((file, idx) => (
+              <div key={idx} className="flex items-center justify-between text-xs bg-muted p-2 rounded">
+                <div className="flex items-center gap-2">
+                  <File className="h-3 w-3" />
+                  <span className="truncate max-w-[240px]">{file.name}</span>
+                  <span className="text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={() => removeFile(idx)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
+        {/* Input Form */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
             handleSend();
           }}
-          className="flex gap-2"
+          className="p-4 flex gap-2"
         >
           <Input
             value={input}
@@ -264,7 +386,24 @@ export const ChatbotWidget = () => {
             disabled={isLoading}
             className="flex-1"
           />
-          <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
+
+          {/* Upload Button - Always visible, enabled only when showFileUpload is true */}
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            disabled={!showFileUpload}
+            onClick={() => fileInputRef.current?.click()}
+            className={`transition-all ${showFileUpload
+              ? 'opacity-100 cursor-pointer hover:bg-accent'
+              : 'opacity-30 cursor-not-allowed'
+              }`}
+            title={showFileUpload ? 'Upload documents (PDF, JPG, PNG)' : 'Upload will be available during medical history'}
+          >
+            <Upload className="h-4 w-4" />
+          </Button>
+
+          <Button type="submit" size="icon" disabled={isLoading || (!input.trim() && uploadedFiles.length === 0)}>
             <Send className="h-4 w-4" />
           </Button>
         </form>

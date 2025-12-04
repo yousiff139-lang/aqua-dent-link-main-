@@ -26,16 +26,17 @@ const AppointmentsTab = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  
+
   // Debug logging
   console.log('👨‍⚕️ AppointmentsTab - Dentist:', dentist);
   console.log('📧 AppointmentsTab - Dentist Email:', dentist?.email);
-  
+
   const { appointments, isLoading, error, refetch } = useAppointments(dentist?.email);
 
   // Set up enhanced real-time subscription for instant updates
   useRealtimeAppointments(
     dentist?.id,
+    dentist?.email,
     {
       onCreated: () => {
         refetch(); // Refetch to get full appointment data with relations
@@ -134,7 +135,7 @@ const AppointmentsTab = () => {
 
     setIsProcessing(true);
     const loadingToast = toast.loading('Marking appointment as completed...');
-    
+
     try {
       await appointmentService.markComplete(selectedAppointment.id);
       toast.success('Appointment marked as completed successfully', { id: loadingToast });
@@ -143,7 +144,7 @@ const AppointmentsTab = () => {
       await refetch();
     } catch (err: any) {
       let errorMessage = err.message || 'Failed to update appointment. Please try again.';
-      
+
       // Handle specific error cases
       if (err.status === 401 || err.shouldRedirect) {
         errorMessage = 'Your session has expired. Please log in again.';
@@ -154,11 +155,11 @@ const AppointmentsTab = () => {
         }, 1500);
         return;
       }
-      
+
       if (err.status === 403) {
         errorMessage = 'You are not authorized to complete this appointment.';
       }
-      
+
       toast.error(errorMessage, { id: loadingToast });
     } finally {
       setIsProcessing(false);
@@ -176,7 +177,7 @@ const AppointmentsTab = () => {
 
     setIsProcessing(true);
     const loadingToast = toast.loading('Cancelling appointment...');
-    
+
     try {
       await appointmentService.cancel(selectedAppointment.id);
       toast.success('Appointment cancelled successfully', { id: loadingToast });
@@ -184,7 +185,23 @@ const AppointmentsTab = () => {
       setSelectedAppointment(null);
       await refetch();
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to cancel appointment. Please try again.';
+      let errorMessage = err.message || 'Failed to cancel appointment. Please try again.';
+
+      // Handle specific error cases
+      if (err.status === 401 || err.shouldRedirect) {
+        errorMessage = 'Your session has expired. Please log in again.';
+        toast.error(errorMessage, { id: loadingToast });
+        // Small delay before redirect to show the error message
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1500);
+        return;
+      }
+
+      if (err.status === 403) {
+        errorMessage = 'You are not authorized to cancel this appointment.';
+      }
+
       toast.error(errorMessage, { id: loadingToast });
     } finally {
       setIsProcessing(false);
@@ -212,7 +229,7 @@ const AppointmentsTab = () => {
 
     setIsProcessing(true);
     const loadingToast = toast.loading('Rescheduling appointment...');
-    
+
     try {
       await appointmentService.reschedule(selectedAppointment.id, date, time);
       toast.success('Appointment rescheduled successfully', { id: loadingToast });
@@ -221,7 +238,7 @@ const AppointmentsTab = () => {
       await refetch();
     } catch (err: any) {
       let errorMessage = 'Failed to reschedule appointment. Please try again.';
-      
+
       // Check if this is a slot unavailable error with alternative slots
       if (err?.response?.status === 409 && err?.response?.data?.error?.details?.alternativeSlots) {
         const alternatives = err.response.data.error.details.alternativeSlots;
@@ -236,14 +253,14 @@ const AppointmentsTab = () => {
             return displayTime;
           })
           .join(", ");
-        
+
         errorMessage = `This time slot is already booked. Available times: ${alternativeTimesText}${alternatives.length > 3 ? " and more" : ""}. Please select a different time.`;
       } else if (err?.response?.data?.error?.message) {
         errorMessage = err.response.data.error.message;
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
+
       toast.error(errorMessage, { id: loadingToast });
       // Don't close the dialog so user can try a different time
     } finally {
@@ -498,14 +515,15 @@ const AppointmentsTab = () => {
                               </Badge>
                             </td>
                             <td className="p-4">
-                              <div className="flex items-center gap-2">
-                                {canMarkComplete && !isFutureAppointment && (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {canMarkComplete && (
                                   <Button
                                     size="sm"
-                                    variant="outline"
+                                    variant={isFutureAppointment ? "outline" : "default"}
                                     onClick={() => handleMarkComplete(appointment)}
-                                    className="whitespace-nowrap"
-                                    title="Mark as completed"
+                                    disabled={isFutureAppointment}
+                                    className={`whitespace-nowrap ${!isFutureAppointment ? 'bg-green-600 hover:bg-green-700 text-white' : 'opacity-50 cursor-not-allowed'}`}
+                                    title={isFutureAppointment ? "Available after appointment time" : "Mark as completed"}
                                   >
                                     <CheckCircle className="h-4 w-4 mr-1" />
                                     Complete
@@ -535,21 +553,74 @@ const AppointmentsTab = () => {
                                     Cancel
                                   </Button>
                                 )}
-                                {(appointment as any).pdf_report_url && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => window.open((appointment as any).pdf_report_url, '_blank')}
-                                    className="whitespace-nowrap"
-                                    title="Download PDF Report"
-                                  >
-                                    <Download className="h-4 w-4 mr-1" />
-                                    PDF
-                                  </Button>
-                                )}
-                                {!canMarkComplete && !canReschedule && !(appointment as any).pdf_report_url && (
-                                  <span className="text-sm text-muted-foreground">-</span>
-                                )}
+                                {/* Always show PDF download for all appointments */}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const apt = appointment as any;
+                                    const printWindow = window.open('', '_blank');
+                                    if (printWindow) {
+                                      printWindow.document.write(`
+                                        <html>
+                                          <head>
+                                            <title>Appointment - ${apt.patient_name}</title>
+                                            <style>
+                                              body { font-family: Arial, sans-serif; padding: 40px; line-height: 1.6; }
+                                              h1 { color:#2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; }
+                                              h2 { color: #374151; margin-top: 20px; }
+                                              .section { margin: 20px 0; }
+                                              .label { font-weight: bold; color: #374151; }
+                                              .value { margin-left: 10px; }
+                                              @media print { button { display: none; } }
+                                            </style>
+                                          </head>
+                                          <body>
+                                            <h1>Appointment Summary</h1>
+                                            <div class="section">
+                                              <h2>Patient Information</h2>
+                                              <p><span class="label">Name:</span><span class="value">${apt.patient_name}</span></p>
+                                              <p><span class="label">Email:</span><span class="value">${apt.patient_email}</span></p>
+                                              <p><span class="label">Phone:</span><span class="value">${apt.patient_phone || 'N/A'}</span></p>
+                                            </div>
+                                            <div class="section">
+                                              <h2>Appointment Details</h2>
+                                              <p><span class="label">Date:</span><span class="value">${formatDate(apt.appointment_date)}</span></p>
+                                              <p><span class="label">Time:</span><span class="value">${formatTime(apt.appointment_time)}</span></p>
+                                              <p><span class="label">Status:</span><span class="value">${apt.status}</span></p>
+                                            </div>
+                                            <div class="section">
+                                              <h2>Medical Information</h2>
+                                              <p><span class="label">Reason for Visit:</span><br/><span class="value">${apt.reason || apt.chief_complaint || apt.symptoms || 'N/A'}</span></p>
+                                              <p><span class="label">Gender:</span><span class="value">${apt.gender || 'N/A'}</span></p>
+                                              <p><span class="label">Pregnant:</span><span class="value">${apt.is_pregnant ? 'Yes' : 'No'}</span></p>
+                                              <p><span class="label">Chronic Diseases:</span><span class="value">${apt.chronic_diseases || 'None'}</span></p>
+                                              <p><span class="label">Medications:</span><span class="value">${apt.medications || 'None'}</span></p>
+                                              <p><span class="label">Allergies:</span><span class="value">${apt.allergies || 'None'}</span></p>
+                                              <p><span class="label">Medical History:</span><span class="value">${apt.medical_history || 'None'}</span></p>
+                                            </div>
+                                            <div class="section">
+                                              <h2>Payment Information</h2>
+                                              <p><span class="label">Method:</span><span class="value">${apt.payment_method}</span></p>
+                                              <p><span class="label">Status:</span><span class="value">${apt.payment_status}</span></p>
+                                            </div>
+                                            <div class="section">
+                                              <h2>Dentist Notes</h2>
+                                              <p>${apt.notes || 'No notes yet'}</p>
+                                            </div>
+                                            <button onclick="window.print()" style="margin-top: 20px; padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 5px; cursor: pointer;">Print/Save as PDF</button>
+                                          </body>
+                                        </html>
+                                      `);
+                                      printWindow.document.close();
+                                    }
+                                  }}
+                                  className="whitespace-nowrap"
+                                  title="Download appointment as PDF"
+                                >
+                                  <Download className="h-4 w-4 mr-1" />
+                                  PDF
+                                </Button>
                               </div>
                             </td>
                           </tr>
@@ -563,7 +634,7 @@ const AppointmentsTab = () => {
           )}
         </>
       )}
-      
+
       {/* Reschedule Dialog */}
       <RescheduleDialog
         open={rescheduleDialogOpen}

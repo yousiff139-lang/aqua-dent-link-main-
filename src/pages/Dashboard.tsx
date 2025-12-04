@@ -180,29 +180,31 @@ const Dashboard = () => {
     }
   };
 
-  const upcomingAppointments = appointments.filter(apt => apt.status === 'upcoming');
+  const upcomingAppointments = appointments.filter(apt =>
+    apt.status === 'upcoming' || apt.status === 'pending'
+  );
   const completedAppointments = appointments.filter(apt => apt.status === 'completed');
   const cancelledAppointments = appointments.filter(apt => apt.status === 'cancelled');
   const historicalAppointments = [...completedAppointments, ...cancelledAppointments] as HistoricalAppointment[];
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary">
       <Navbar />
-      
+
       <div className="container mx-auto px-4 pt-24 pb-12">
         <div className="mb-8 animate-slide-up">
           <h1 className="text-4xl font-bold mb-2">
             Welcome back, {
-              profile?.full_name || 
-              user?.user_metadata?.full_name || 
-              user?.user_metadata?.first_name || 
-              user?.email?.split('@')[0] || 
+              profile?.full_name ||
+              user?.user_metadata?.full_name ||
+              user?.user_metadata?.first_name ||
+              user?.email?.split('@')[0] ||
               'User'
             }! 👋
           </h1>
           <p className="text-muted-foreground">Manage your appointments and dental health journey</p>
         </div>
-        
+
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card className="gradient-card p-6 border-border/50 hover:shadow-aqua-md transition-smooth">
             <div className="flex items-center gap-4">
@@ -215,7 +217,7 @@ const Dashboard = () => {
               </div>
             </div>
           </Card>
-          
+
           <Card className="gradient-card p-6 border-border/50 hover:shadow-aqua-md transition-smooth">
             <div className="flex items-center gap-4">
               <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-3 rounded-2xl flex items-center justify-center">
@@ -227,7 +229,7 @@ const Dashboard = () => {
               </div>
             </div>
           </Card>
-          
+
           <Card className="gradient-card p-6 border-border/50 hover:shadow-aqua-md transition-smooth">
             <div className="flex items-center gap-4">
               <div className="bg-gradient-to-br from-green-500 to-emerald-500 p-3 rounded-2xl flex items-center justify-center">
@@ -240,7 +242,7 @@ const Dashboard = () => {
             </div>
           </Card>
         </div>
-        
+
         <div className="grid md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-6">
             <div className="flex items-center justify-between">
@@ -250,7 +252,7 @@ const Dashboard = () => {
                 Book New
               </Button>
             </div>
-            
+
             <Tabs defaultValue="upcoming" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="upcoming" className="flex items-center gap-2">
@@ -262,7 +264,7 @@ const Dashboard = () => {
                   History ({historicalAppointments.length})
                 </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="upcoming" className="mt-6">
                 {upcomingAppointments.length > 0 ? (
                   <AppointmentsList
@@ -279,8 +281,8 @@ const Dashboard = () => {
                       <p className="text-sm text-muted-foreground mt-1">
                         Book your first appointment to get started!
                       </p>
-                      <Button 
-                        className="gradient-primary text-primary-foreground mt-4" 
+                      <Button
+                        className="gradient-primary text-primary-foreground mt-4"
                         onClick={() => navigate('/dentists')}
                       >
                         <Calendar className="w-4 h-4 mr-2" />
@@ -290,7 +292,7 @@ const Dashboard = () => {
                   </Card>
                 )}
               </TabsContent>
-              
+
               <TabsContent value="history" className="mt-6">
                 <BookingHistory
                   appointments={historicalAppointments}
@@ -299,13 +301,13 @@ const Dashboard = () => {
               </TabsContent>
             </Tabs>
           </div>
-          
+
           <div className="space-y-6">
             <Card className="gradient-card p-6 border-border/50">
               <h3 className="font-semibold text-lg mb-4">Quick Actions</h3>
               <div className="space-y-3">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full justify-start hover:bg-primary/5 border-primary/20"
                   onClick={() => setShowChat(true)}
                 >
@@ -320,8 +322,8 @@ const Dashboard = () => {
                   <User className="w-4 h-4 mr-2" />
                   Update Profile
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full justify-start hover:bg-destructive/10 border-destructive/20 text-destructive"
                   onClick={handleSignOut}
                 >
@@ -330,7 +332,7 @@ const Dashboard = () => {
                 </Button>
               </div>
             </Card>
-            
+
             <Card className="gradient-card p-6 border-border/50 bg-gradient-to-br from-primary/5 to-accent/5">
               <h3 className="font-semibold text-lg mb-2">💡 Dental Tip</h3>
               <p className="text-sm text-muted-foreground">
@@ -340,7 +342,7 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-      
+
       <CancellationDialog
         open={cancelDialogOpen}
         onOpenChange={setCancelDialogOpen}
@@ -348,21 +350,21 @@ const Dashboard = () => {
         appointmentDetails={
           appointmentToCancel
             ? {
-                dentistName: appointmentToCancel.dentist_name || 'Dentist',
-                date: formatAppointmentDateTime(
-                  appointmentToCancel.appointment_date,
-                  appointmentToCancel.appointment_time
-                ).date,
-                time: formatAppointmentDateTime(
-                  appointmentToCancel.appointment_date,
-                  appointmentToCancel.appointment_time
-                ).time,
-              }
+              dentistName: appointmentToCancel.dentist_name || 'Dentist',
+              date: formatAppointmentDateTime(
+                appointmentToCancel.appointment_date,
+                appointmentToCancel.appointment_time
+              ).date,
+              time: formatAppointmentDateTime(
+                appointmentToCancel.appointment_date,
+                appointmentToCancel.appointment_time
+              ).time,
+            }
             : undefined
         }
         isLoading={isCancelling}
       />
-      
+
       <Footer />
       <ChatbotWidget />
     </div>

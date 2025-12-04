@@ -301,7 +301,7 @@ export class AppointmentsController {
     validationService.validateUUID(id, 'Appointment ID');
 
     // Cancel appointment
-    await appointmentsService.cancelAppointment(id, userId);
+    const cancelledAppointment = await appointmentsService.cancelAppointment(id, userId);
 
     logger.info('Appointment cancelled', {
       appointmentId: id,
@@ -311,6 +311,7 @@ export class AppointmentsController {
     res.json({
       success: true,
       message: 'Appointment cancelled successfully',
+      data: cancelledAppointment,
     });
   });
 }

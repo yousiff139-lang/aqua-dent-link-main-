@@ -1,8 +1,16 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 // Load environment variables
 dotenv.config();
+
+// Also try to load from root directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 // Environment variable schema
 const envSchema = z.object({
@@ -12,7 +20,12 @@ const envSchema = z.object({
 
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).refine(
+    (key) => key.startsWith('eyJ'),
+    {
+      message: 'SUPABASE_SERVICE_ROLE_KEY should start with "eyJ" (JWT format). If it starts with "sb_", you are using a publishable key instead of the service role key. Please get the service role key from Supabase Dashboard > Settings > API > service_role key (secret).'
+    }
+  ),
 
   CORS_ORIGIN: z
     .string()
@@ -22,8 +35,8 @@ const envSchema = z.object({
         'http://localhost:3000',   // legacy user app / production preview
         'http://localhost:3001',   // backend itself / health checks
         'http://localhost:3010',   // admin portal dev server
-        'http://localhost:5173',   // vite default
-        'http://localhost:5174',   // dentist portal/dev variant
+        'http://localhost:5173',   // vite default / user web
+        'http://localhost:5174',   // dentist portal
         'http://localhost:8080',   // alt user portal port
       ].join(',')
     ),

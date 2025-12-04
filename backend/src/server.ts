@@ -16,8 +16,12 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(helmet());
+import { env, corsOrigins } from './config/env.js';
+
+// ...
+
 app.use(cors({
-  origin: [process.env.FRONTEND_URL!, process.env.ADMIN_URL!],
+  origin: corsOrigins,
   credentials: true
 }));
 app.use(morgan('dev'));
@@ -37,7 +41,7 @@ app.get('/health', (req: Request, res: Response) => {
 app.get('/api/test/connection', async (req: Request, res: Response) => {
   try {
     const isConnected = await testConnection();
-    
+
     if (isConnected) {
       res.json({
         success: true,
@@ -83,7 +87,7 @@ app.use((err: Error, req: Request, res: Response, next: any) => {
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV}`);
-  
+
   // Test database connection on startup
   await testConnection();
 });

@@ -8,12 +8,14 @@ export const getAuthSession = (): AuthSession | null => {
     if (!stored) return null;
 
     const session: AuthSession = JSON.parse(stored);
-    
-    // Check if session is expired
-    if (session.expiresAt && Date.now() > session.expiresAt) {
-      clearAuthSession();
-      return null;
-    }
+
+    // Check if session is expired - REMOVED
+    // We rely on the backend to validate the token
+    // This prevents issues where client clock is wrong or token is still valid
+    // if (session.expiresAt && Date.now() > session.expiresAt) {
+    //   clearAuthSession();
+    //   return null;
+    // }
 
     return session;
   } catch (error) {
@@ -40,5 +42,14 @@ export const clearAuthSession = (): void => {
 
 export const getAuthToken = (): string | null => {
   const session = getAuthSession();
-  return session?.token || null;
+  if (!session?.token) {
+    console.warn('No session or token found');
+    return null;
+  }
+
+  // Don't validate expiration on frontend - let backend handle it
+  // This prevents false positives where token might be valid but our check fails
+  // The backend will properly validate and return appropriate errors
+
+  return session.token;
 };

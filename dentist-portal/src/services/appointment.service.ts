@@ -33,9 +33,13 @@ const performUpdate = async (id: string, updates: Record<string, any>): Promise<
     const response = await api.put(`/appointments/${id}`, updates);
     return unwrapAppointment(response);
   } catch (error: any) {
+    // Preserve authentication errors with their status codes
+    if (error.status === 401 || error.shouldRedirect) {
+      throw error;
+    }
     const message =
       error?.response?.data?.error?.message ||
-      error.message ||
+      error?.message ||
       'Failed to update appointment. Please try again.';
     throw new Error(message);
   }
@@ -84,13 +88,27 @@ export const appointmentService = {
   },
 
   /**
-   * Cancel an appointment
+   * Cancel an appointment using DELETE endpoint
    */
-  cancel: async (id: string, reason?: string): Promise<Appointment> => {
-    return performUpdate(id, { 
-      status: 'cancelled',
-      cancellation_reason: reason,
-      cancelled_at: new Date().toISOString(),
-    });
+  cancel: async (id: string, reason?: string): Promise<void> => {
+    try {
+      const response = await api.delete(`/appointments/${id}`, {
+        data: reason ? { cancellation_reason: reason } : undefined,
+      });
+      // DELETE endpoint returns { success: true, message: '...' }
+      // No appointment data is returned, so we don't need to unwrap
+      return;
+    } catch (error: any) {
+      // Preserve authentication errors with their status codes
+      if (error.status === 401 || error.shouldRedirect) {
+        throw error;
+      }
+      const message =
+        error?.response?.data?.error?.message ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to cancel appointment. Please try again.';
+      throw new Error(message);
+    }
   },
 };

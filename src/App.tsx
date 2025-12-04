@@ -16,6 +16,7 @@ import EnhancedDentistDashboard from "./pages/EnhancedDentistDashboard";
 import DentistPortal from "./pages/DentistPortal";
 import Dentists from "./pages/Dentists";
 import EnhancedDentists from "./pages/EnhancedDentists";
+import Services from "./pages/Services";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
@@ -39,7 +40,7 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   useNetworkStatus();
-  
+
   return (
     <>
       <Routes>
@@ -53,6 +54,7 @@ function AppContent() {
         <Route path="/dentist-portal" element={<ProtectedRoute><DentistPortal /></ProtectedRoute>} />
         <Route path="/dentist/:id" element={<DentistProfile />} />
         <Route path="/dentists" element={<EnhancedDentists />} />
+        <Route path="/services" element={<Services />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/my-appointments" element={<ProtectedRoute><MyAppointments /></ProtectedRoute>} />
         <Route path="/payment-success" element={<PaymentSuccess />} />

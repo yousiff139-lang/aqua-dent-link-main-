@@ -20,6 +20,7 @@ export class ValidationService {
       notes: z.string().optional(),
       patient_notes: z.string().optional(),
       medical_history: z.string().optional(),
+      documents: z.any().optional(),
     }),
 
     update: z.object({

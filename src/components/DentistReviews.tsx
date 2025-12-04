@@ -11,6 +11,8 @@ interface Review {
 }
 
 // Virtual reviews data - in production, this would come from a database
+// Distribution: ~92% five stars, ~6% four stars, ~2% three stars (approximated for 6 reviews)
+// This gives an average rating of 4.5: (5+5+5+5+4+3)/6 = 27/6 = 4.5
 const generateVirtualReviews = (dentistName: string): Review[] => {
   const reviews: Review[] = [
     {
@@ -40,24 +42,24 @@ const generateVirtualReviews = (dentistName: string): Review[] => {
     {
       id: "4",
       patientName: "James W.",
-      rating: 4,
-      comment: `Great dentist! Very knowledgeable and patient. The only reason I'm giving 4 stars instead of 5 is because the wait time was a bit long, but the service was worth it.`,
+      rating: 5,
+      comment: `Great dentist! Very knowledgeable and patient. Dr. ${dentistName} provides excellent care and I'm very satisfied with the service.`,
       date: "1 month ago",
       verified: true,
     },
     {
       id: "5",
       patientName: "Lisa K.",
-      rating: 5,
-      comment: `Dr. ${dentistName} is the best dentist I've ever been to! Very thorough, explains everything, and genuinely cares about your dental health. The office has state-of-the-art equipment too.`,
+      rating: 4,
+      comment: `Dr. ${dentistName} is very thorough and professional. The only reason I'm giving 4 stars instead of 5 is because the wait time was a bit long, but the service was worth it.`,
       date: "2 months ago",
       verified: true,
     },
     {
       id: "6",
       patientName: "Robert B.",
-      rating: 5,
-      comment: `Outstanding service! Dr. ${dentistName} and the entire team are professional, friendly, and make you feel at ease. I've recommended them to all my friends and family.`,
+      rating: 3,
+      comment: `Dr. ${dentistName} is competent and the office is clean. The service was good overall, though I felt the consultation could have been more detailed.`,
       date: "3 weeks ago",
       verified: true,
     },
@@ -72,8 +74,13 @@ interface DentistReviewsProps {
   totalReviews?: number;
 }
 
-export function DentistReviews({ dentistName, averageRating = 4.9, totalReviews = 24 }: DentistReviewsProps) {
+export function DentistReviews({ dentistName, averageRating, totalReviews }: DentistReviewsProps) {
   const reviews = generateVirtualReviews(dentistName);
+  // Calculate average rating from the actual reviews if not provided
+  const calculatedAverage = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
+  const finalAverageRating = averageRating !== undefined ? averageRating : calculatedAverage;
+  // Use the actual number of reviews generated, or the provided totalReviews, whichever is available
+  const reviewCount = totalReviews !== undefined ? totalReviews : reviews.length;
 
   return (
     <div className="space-y-6">
@@ -88,18 +95,18 @@ export function DentistReviews({ dentistName, averageRating = 4.9, totalReviews 
                   <Star
                     key={i}
                     className={`h-5 w-5 ${
-                      i < Math.floor(averageRating)
+                      i < Math.floor(finalAverageRating)
                         ? "text-yellow-500 fill-yellow-500"
-                        : i < averageRating
+                        : i < finalAverageRating
                         ? "text-yellow-500 fill-yellow-500 opacity-50"
                         : "text-gray-300"
                     }`}
                   />
                 ))}
               </div>
-              <span className="text-lg font-semibold ml-2">{averageRating.toFixed(1)}</span>
+              <span className="text-lg font-semibold ml-2">{finalAverageRating.toFixed(1)}</span>
             </div>
-            <span className="text-muted-foreground">({totalReviews} reviews)</span>
+            <span className="text-muted-foreground">({reviewCount} reviews)</span>
           </div>
         </div>
       </div>
@@ -150,9 +157,9 @@ export function DentistReviews({ dentistName, averageRating = 4.9, totalReviews 
       {/* Review Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
         {[
-          { label: "5 Stars", value: "92%", color: "bg-green-500" },
-          { label: "4 Stars", value: "6%", color: "bg-blue-500" },
-          { label: "3 Stars", value: "2%", color: "bg-yellow-500" },
+          { label: "5 Stars", value: "67%", color: "bg-green-500" },
+          { label: "4 Stars", value: "17%", color: "bg-blue-500" },
+          { label: "3 Stars", value: "17%", color: "bg-yellow-500" },
           { label: "Would Recommend", value: "98%", color: "bg-primary" },
         ].map((stat, index) => (
           <div

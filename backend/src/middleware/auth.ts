@@ -3,6 +3,7 @@ import { supabaseAuth } from '../config/supabase.js';
 import { AppError } from '../utils/errors.js';
 import { logger } from '../config/logger.js';
 import { AuthenticatedRequest } from '../types/index.js';
+import jwt from 'jsonwebtoken';
 
 /**
  * Middleware to authenticate requests using JWT tokens
@@ -15,23 +16,48 @@ export const authenticateRequest = async (
   try {
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      logger.warn('No authorization header provided', {
+        path: req.path,
+        method: req.method,
+        hasHeader: !!authHeader,
+      });
       throw AppError.unauthorized('No token provided');
     }
 
     const token = authHeader.replace('Bearer ', '');
 
+    // Log token receipt for debugging (first 20 chars only)
+    logger.debug('Received authentication token', {
+      path: req.path,
+      method: req.method,
+      tokenLength: token.length,
+      tokenPreview: token.substring(0, 20) + '...',
+    });
+
     // Try to verify with our custom JWT first (for dentist portal)
     let isCustomJWT = false;
+    const JWT_SECRET = process.env.JWT_SECRET || 'dentist-portal-secret-key-change-in-production-2024';
+
+    // First, try to decode without verification to check if it's a dentist token
+    // This is faster and doesn't fail on expired tokens
+    let decodedUnverified: any = null;
     try {
-      const jwt = await import('jsonwebtoken');
-      const JWT_SECRET = process.env.JWT_SECRET || 'dentist-portal-secret-key-change-in-production-2024';
-      
-      const decoded = jwt.verify(token, JWT_SECRET, { complete: false }) as any;
-      
-      if (decoded && decoded.type === 'dentist') {
-        // This is a dentist portal token
+      decodedUnverified = jwt.decode(token, { complete: false }) as any;
+    } catch (decodeError: any) {
+      logger.debug('Could not decode token, trying Supabase', {
+        decodeError: decodeError.message,
+        path: req.path,
+      });
+    }
+
+    // If it looks like a dentist token, try to verify it
+    if (decodedUnverified && decodedUnverified.type === 'dentist') {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET, { complete: false }) as any;
+
+        // Verification succeeded - this is a valid dentist token
         isCustomJWT = true;
         (req as AuthenticatedRequest).user = {
           id: decoded.dentistId,
@@ -39,7 +65,7 @@ export const authenticateRequest = async (
           role: 'dentist',
         };
 
-        logger.debug('Dentist authenticated', {
+        logger.debug('Dentist authenticated via JWT', {
           userId: decoded.dentistId,
           email: decoded.email,
           path: req.path,
@@ -47,12 +73,37 @@ export const authenticateRequest = async (
 
         next();
         return;
+      } catch (jwtVerifyError: any) {
+        // Verification failed for a dentist token - this is an error
+        logger.warn('Dentist token verification failed', {
+          error: jwtVerifyError.name,
+          message: jwtVerifyError.message,
+          path: req.path,
+          method: req.method,
+          decodedEmail: decodedUnverified?.email,
+          decodedDentistId: decodedUnverified?.dentistId,
+          tokenExp: decodedUnverified?.exp,
+          currentTime: Math.floor(Date.now() / 1000),
+        });
+
+        // Provide specific error messages
+        let errorMessage = 'Authentication failed. Please log in again.';
+        if (jwtVerifyError.name === 'TokenExpiredError') {
+          errorMessage = 'Your session has expired. Please log in again.';
+        } else if (jwtVerifyError.name === 'JsonWebTokenError') {
+          errorMessage = 'Invalid token. Please log in again.';
+        }
+
+        throw AppError.unauthorized(errorMessage);
       }
-    } catch (jwtError: any) {
-      // If it's a JWT error but not a verification error, log it
-      if (jwtError.name !== 'JsonWebTokenError') {
-        logger.debug('JWT verification failed, trying Supabase', { error: jwtError.message });
-      }
+    }
+
+    // If it's not a dentist token, log and continue to Supabase
+    if (decodedUnverified && decodedUnverified.type !== 'dentist') {
+      logger.debug('Token is not a dentist token, trying Supabase', {
+        tokenType: decodedUnverified.type,
+        path: req.path,
+      });
     }
 
     // If not a custom JWT, verify token with Supabase
@@ -104,7 +155,7 @@ export const optionalAuth = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       // No token provided, continue without user
       next();

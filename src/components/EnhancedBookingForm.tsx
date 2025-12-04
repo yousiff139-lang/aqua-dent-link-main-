@@ -197,6 +197,8 @@ export function EnhancedBookingForm({
 
         // Generate time slots based on dentist's availability
         const slots: { value: string; label: string }[] = [];
+        const now = new Date();
+        const isToday = selectedDate.toDateString() === now.toDateString();
 
         data.forEach((availability: any) => {
           const startTime = availability.start_time; // e.g., "12:00:00"
@@ -215,13 +217,26 @@ export function EnhancedBookingForm({
             (currentHour === endHour && currentMin < endMin)
           ) {
             const timeValue = `${currentHour.toString().padStart(2, '0')}:${currentMin.toString().padStart(2, '0')}`;
-            const displayTime = new Date(`2000-01-01T${timeValue}`).toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-            });
 
-            slots.push({ value: timeValue, label: displayTime });
+            // Check if time has passed for today
+            let isPastTime = false;
+            if (isToday) {
+              const slotTime = new Date(selectedDate);
+              slotTime.setHours(currentHour, currentMin, 0, 0);
+              if (slotTime <= now) {
+                isPastTime = true;
+              }
+            }
+
+            if (!isPastTime) {
+              const displayTime = new Date(`2000-01-01T${timeValue}`).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              });
+
+              slots.push({ value: timeValue, label: displayTime });
+            }
 
             // Increment by slot duration
             currentMin += slotDuration;
@@ -232,7 +247,36 @@ export function EnhancedBookingForm({
           }
         });
 
-        setAvailableTimeSlots(slots);
+        // Fetch existing appointments for this date to filter out booked slots
+        // @ts-ignore - Supabase types are outdated, appointment_time column exists
+        const { data: existingAppointments, error: apptError } = await supabase
+          .from('appointments')
+          .select('appointment_time')
+          .eq('dentist_email', dentistEmail)
+          .eq('appointment_date', selectedDate.toISOString().split('T')[0])
+          .in('status', ['pending', 'confirmed']);
+
+        if (apptError) {
+          console.error('Error fetching existing appointments:', apptError);
+        }
+
+        // Create a set of booked times for fast lookup
+        const bookedTimes = new Set(
+          existingAppointments?.map(apt => apt.appointment_time) || []
+        );
+
+        // Filter out booked slots
+        const availableSlots = slots.filter(slot => !bookedTimes.has(slot.value));
+
+        if (availableSlots.length === 0) {
+          toast({
+            title: "No Availability",
+            description: `All time slots for ${dentistName} on this day are fully booked. Please select another date.`,
+            variant: "destructive",
+          });
+        }
+
+        setAvailableTimeSlots(availableSlots);
       } catch (err) {
         console.error('Error fetching availability:', err);
         toast({
@@ -272,7 +316,7 @@ export function EnhancedBookingForm({
   const uploadFiles = async (appointmentId: string) => {
     if (uploadedFiles.length === 0) return [];
 
-    const uploadedUrls: string[] = [];
+    const uploadedDocs: { name: string; url: string }[] = [];
 
     for (const file of uploadedFiles) {
       try {
@@ -292,26 +336,16 @@ export function EnhancedBookingForm({
           .from('medical-documents')
           .getPublicUrl(fileName);
 
-        // Save document record
-        await supabase
-          .from('medical_documents')
-          .insert({
-            appointment_id: appointmentId,
-            patient_id: user?.id,
-            file_name: file.name,
-            file_url: urlData.publicUrl,
-            file_type: file.type,
-            file_size: file.size,
-            description: `Uploaded during appointment booking`
-          });
-
-        uploadedUrls.push(urlData.publicUrl);
+        uploadedDocs.push({
+          name: file.name,
+          url: urlData.publicUrl
+        });
       } catch (error) {
         console.error('Error uploading file:', error);
       }
     }
 
-    return uploadedUrls;
+    return uploadedDocs;
   };
 
   const onSubmit = async (data: EnhancedBookingFormValues) => {
@@ -338,6 +372,7 @@ export function EnhancedBookingForm({
           patient_name: data.patientName,
           patient_email: data.patientEmail,
           patient_phone: data.phone,
+          // @ts-ignore - Types are outdated, columns exist in DB
           gender: data.gender,
           is_pregnant: data.isPregnant || false,
           dentist_id: dentistId,
@@ -373,9 +408,57 @@ export function EnhancedBookingForm({
 
       const appointmentId = appointment.id;
 
-      // Upload files if any
+      // Save medical information to dedicated table for reliable PDF generation
+      try {
+        // Upload files first if any
+        const uploadedDocs = uploadedFiles.length > 0 ? await uploadFiles(appointmentId) : [];
+
+        const { error: medicalError } = await supabase
+          .from('appointment_medical_info')
+          .insert({
+            appointment_id: appointmentId,
+            patient_id: user.id,
+            gender: data.gender,
+            is_pregnant: data.isPregnant || false,
+            chronic_diseases: data.chronicDiseases,
+            medical_history: data.medicalHistory,
+            medications: data.medications,
+            allergies: data.allergies,
+            previous_dental_work: data.previousDentalWork,
+            smoking: data.smoking,
+            symptoms: data.symptoms,
+            chief_complaint: data.chiefComplaint,
+            documents: uploadedDocs || []
+          });
+
+        if (medicalError) {
+          console.error('Error saving medical info:', medicalError);
+        }
+      } catch (medicalSaveError) {
+        console.error('Medical info save error:', medicalSaveError);
+      }
+
+      // Upload files if any and update appointment with document metadata
       if (uploadedFiles.length > 0) {
-        await uploadFiles(appointmentId);
+        const uploadedDocs = await uploadFiles(appointmentId);
+
+        if (uploadedDocs.length > 0) {
+          // @ts-ignore - documents column exists in DB
+          const { error: updateError } = await supabase
+            .from('appointments')
+            .update({ documents: uploadedDocs })
+            .eq('id', appointmentId);
+
+          if (updateError) {
+            console.error('Error updating appointment with documents:', updateError);
+            // Don't fail the whole booking, just log error
+            toast({
+              title: "Warning",
+              description: "Appointment booked but failed to link documents.",
+              variant: "destructive"
+            });
+          }
+        }
       }
 
       // Generate PDF and send notifications

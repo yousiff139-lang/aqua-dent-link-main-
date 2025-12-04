@@ -7,166 +7,97 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/Toaster'
-import { Save, Upload, X } from 'lucide-react'
+import { Save, Upload, X, Loader2 } from 'lucide-react'
+import api from '@/lib/api'
 
 interface DoctorProfile {
-  id: number
-  full_name: string
+  id: string
+  name: string
   email: string
   specialization: string
   years_of_experience: number
-  rating: number
   bio: string
-  profileImage: string
+  image_url: string | null
   education?: string
-  clinic_address?: string
-  contact_info?: string
-  available_times?: {
-    monday?: string
-    tuesday?: string
-    wednesday?: string
-    thursday?: string
-    friday?: string
-    saturday?: string
-    sunday?: string
-  }
+  phone?: string
+  status?: string
 }
 
 export default function EditProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [isLoading, setIsLoading] = useState(false)
-  const [imagePreview, setImagePreview] = useState<string>('')
-  
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [originalData, setOriginalData] = useState<DoctorProfile | null>(null)
+
   const [formData, setFormData] = useState<DoctorProfile>({
-    id: 0,
-    full_name: '',
+    id: '',
+    name: '',
     email: '',
     specialization: '',
     years_of_experience: 0,
-    rating: 5.0,
     bio: '',
-    profileImage: '/avatars/default.png',
+    image_url: null,
     education: '',
-    clinic_address: '',
-    contact_info: '',
-    available_times: {
-      monday: '',
-      tuesday: '',
-      wednesday: '',
-      thursday: '',
-      friday: '',
-      saturday: '',
-      sunday: '',
-    },
+    phone: '',
+    status: 'active',
   })
 
   useEffect(() => {
     loadDoctorProfile()
   }, [id])
 
-  const loadDoctorProfile = () => {
-    // Hardcoded doctors data (same as Doctors page)
-    const doctors = [
-      {
-        id: 1,
-        full_name: "Dr. Sarah Johnson",
-        email: "sarah.johnson@dentalcare.com",
-        specialization: "General Dentistry",
-        bio: "Passionate about patient care with 3 years of training. Specializes in preventive care and cosmetic procedures.",
-        years_of_experience: 3,
-        rating: 4.9,
-        profileImage: "/avatars/dentist-1.jpg",
-        education: "DDS, Harvard School of Dental Medicine",
-        clinic_address: "123 Dental St, Boston, MA",
-        contact_info: "+1 (555) 123-4567"
-      },
-      {
-        id: 2,
-        full_name: "Dr. Michael Chen",
-        email: "michael.chen@dentalcare.com",
-        specialization: "Orthodontics",
-        bio: "Dedicated to creating beautiful smiles. Expert in braces and alignment treatments with a gentle approach.",
-        years_of_experience: 5,
-        rating: 4.8,
-        profileImage: "/avatars/dentist-2.jpg",
-        education: "DDS, University of Toronto",
-        clinic_address: "Downtown Dental Care, Toronto, Canada",
-        contact_info: "+1 (416) 555-0123"
-      },
-      {
-        id: 3,
-        full_name: "Dr. Emily Rodriguez",
-        email: "emily.rodriguez@dentalcare.com",
-        specialization: "Cosmetic Dentistry",
-        bio: "Focused on aesthetic dentistry and smile makeovers. Trained in the latest whitening and veneer techniques.",
-        years_of_experience: 4,
-        rating: 5.0,
-        profileImage: "/avatars/dentist-3.jpg",
-        education: "DMD, UCLA School of Dentistry",
-        clinic_address: "456 Smile Ave, Los Angeles, CA",
-        contact_info: "+1 (310) 555-7890"
-      },
-      {
-        id: 4,
-        full_name: "Dr. James Wilson",
-        email: "james.wilson@dentalcare.com",
-        specialization: "Endodontics",
-        bio: "Root canal specialist with a pain-free approach. Committed to saving natural teeth and patient comfort.",
-        years_of_experience: 6,
-        rating: 4.7,
-        profileImage: "/avatars/dentist-2.jpg",
-        education: "DDS, University of Washington",
-        clinic_address: "789 Care Blvd, Seattle, WA",
-        contact_info: "+1 (206) 555-3456"
-      },
-      {
-        id: 5,
-        full_name: "Dr. Lisa Thompson",
-        email: "lisa.thompson@dentalcare.com",
-        specialization: "Pediatric Dentistry",
-        bio: "Making dental visits fun for kids! Experienced in working with children and anxious patients.",
-        years_of_experience: 7,
-        rating: 4.9,
-        profileImage: "/avatars/dentist-1.jpg",
-        education: "DDS, Boston Children's Hospital",
-        clinic_address: "321 Kids Way, Boston, MA",
-        contact_info: "+1 (617) 555-6789"
-      },
-      {
-        id: 6,
-        full_name: "Dr. David Kim",
-        email: "david.kim@dentalcare.com",
-        specialization: "Oral Surgery",
-        bio: "Expert in extractions and surgical procedures. Known for precision and minimal recovery time.",
-        years_of_experience: 8,
-        rating: 4.8,
-        profileImage: "/avatars/dentist-2.jpg",
-        education: "DMD, Harvard Medical School",
-        clinic_address: "654 Surgery St, New York, NY",
-        contact_info: "+1 (212) 555-9012"
-      }
-    ]
-
-    const doctor = doctors.find(d => d.id === parseInt(id || '0'))
-    if (doctor) {
-      setFormData({
-        ...doctor,
-        available_times: {
-          monday: '09:00-17:00',
-          tuesday: '09:00-17:00',
-          wednesday: '09:00-17:00',
-          thursday: '09:00-17:00',
-          friday: '09:00-17:00',
-          saturday: '10:00-14:00',
-          sunday: '',
-        }
+  const loadDoctorProfile = async () => {
+    if (!id) {
+      toast({
+        title: 'Error',
+        description: 'No dentist ID provided',
+        variant: 'destructive',
       })
-      setImagePreview(doctor.profileImage)
+      navigate('/doctors')
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      const response = await api.get(`/admin/dentists/${id}`)
+      const dentist = response.data
+
+      const profileData: DoctorProfile = {
+        id: dentist.id,
+        name: dentist.name || '',
+        email: dentist.email || '',
+        specialization: dentist.specialization || '',
+        years_of_experience: dentist.years_of_experience || 0,
+        bio: dentist.bio || '',
+        image_url: dentist.image_url || dentist.profile_picture || null,
+        education: dentist.education || '',
+        phone: dentist.phone || '',
+        status: dentist.status || 'active',
+      }
+
+      setFormData(profileData)
+      setOriginalData(profileData)
+
+      if (dentist.image_url || dentist.profile_picture) {
+        setImagePreview(dentist.image_url || dentist.profile_picture)
+      }
+    } catch (error: any) {
+      console.error('Error loading dentist:', error)
+      toast({
+        title: 'Failed to load dentist',
+        description: error.message || 'Please try again',
+        variant: 'destructive',
+      })
+      navigate('/doctors')
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -180,7 +111,7 @@ export default function EditProfile() {
       return
     }
 
-    // Validate file size (2MB max)
+    // Validate file size (2MB max for better performance)
     if (file.size > 2 * 1024 * 1024) {
       toast({
         title: 'File too large',
@@ -190,47 +121,137 @@ export default function EditProfile() {
       return
     }
 
+    setImageFile(file)
+
     // Create preview
     const reader = new FileReader()
     reader.onloadend = () => {
       setImagePreview(reader.result as string)
-      setFormData({ ...formData, profileImage: reader.result as string })
     }
     reader.readAsDataURL(file)
   }
 
+  const clearImage = () => {
+    setImageFile(null)
+    setImagePreview(formData.image_url)
+  }
+
+  // Check if form has changes
+  const hasChanges = () => {
+    if (!originalData) return false
+    if (imageFile) return true // New image selected
+
+    return (
+      formData.name !== originalData.name ||
+      formData.email !== originalData.email ||
+      formData.specialization !== originalData.specialization ||
+      formData.phone !== originalData.phone ||
+      formData.years_of_experience !== originalData.years_of_experience ||
+      formData.education !== originalData.education ||
+      formData.bio !== originalData.bio
+    )
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+
+    if (!hasChanges()) {
+      toast({
+        title: 'No changes',
+        description: 'No changes detected to save',
+      })
+      return
+    }
+
+    setIsSaving(true)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const submitData: any = {
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        specialization: formData.specialization.trim(),
+        phone: formData.phone?.trim() || '',
+        years_of_experience: formData.years_of_experience,
+        education: formData.education?.trim() || '',
+        bio: formData.bio?.trim() || '',
+        status: formData.status,
+      }
+
+      // If there's a new image, convert to base64 and include
+      if (imageFile) {
+        const reader = new FileReader()
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(imageFile)
+        })
+
+        try {
+          submitData.image_url = await base64Promise
+        } catch (error) {
+          throw new Error('Failed to process image file')
+        }
+      }
+
+      await api.put(`/admin/dentists/${id}`, submitData)
 
       toast({
         title: 'Success!',
-        description: 'Profile updated successfully!',
+        description: 'Dentist profile updated successfully!',
       })
 
-      navigate('/doctors')
+      // Reload to refresh data
+      await loadDoctorProfile()
+      setImageFile(null)
+
+      // Navigate back after a short delay
+      setTimeout(() => {
+        navigate('/doctors', { state: { refresh: true } })
+      }, 500)
     } catch (error: any) {
       console.error('Error saving profile:', error)
+
+      let errorMessage = 'Failed to save profile'
+      if (error.message) {
+        errorMessage = error.message
+      } else if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message
+      }
+
       toast({
         title: 'Error',
-        description: error.message || 'Failed to save profile',
+        description: errorMessage,
         variant: 'destructive',
+        duration: 5000,
       })
     } finally {
-      setIsLoading(false)
+      setIsSaving(false)
     }
   }
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
+            <p className="text-gray-500">Loading dentist profile...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  const formChanged = hasChanges()
 
   return (
     <DashboardLayout>
       <div className="max-w-4xl">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Edit Your Profile – {formData.full_name}</h1>
-          <p className="text-gray-500 mt-1">Update your information and it will sync across both dashboards</p>
+          <h1 className="text-3xl font-bold text-gray-900">Edit Dentist Profile – {formData.name}</h1>
+          <p className="text-gray-500 mt-1">Update dentist information and it will sync across all apps</p>
         </div>
 
         <Card className="border-0 shadow-lg">
@@ -243,17 +264,31 @@ export default function EditProfile() {
               <div className="space-y-4">
                 <Label>Profile Image</Label>
                 <div className="flex items-center gap-6">
-                  <img
-                    src={imagePreview || formData.profileImage}
-                    alt="Profile preview"
-                    className="w-24 h-24 rounded-full object-cover shadow-md"
-                  />
+                  <div className="relative">
+                    <img
+                      src={imagePreview || formData.image_url || '/avatars/default.png.svg'}
+                      alt="Profile preview"
+                      className="w-24 h-24 rounded-full object-cover shadow-md"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/avatars/default.png.svg'
+                      }}
+                    />
+                    {imageFile && (
+                      <button
+                        type="button"
+                        onClick={clearImage}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                   <div className="flex-1">
                     <input
                       type="file"
                       id="image-upload"
-                      accept="image/jpeg,image/png"
-                      onChange={handleImageUpload}
+                      accept="image/jpeg,image/png,image/jpg"
+                      onChange={handleImageChange}
                       className="hidden"
                     />
                     <Button
@@ -262,7 +297,7 @@ export default function EditProfile() {
                       onClick={() => document.getElementById('image-upload')?.click()}
                     >
                       <Upload className="w-4 h-4 mr-2" />
-                      Upload New Image
+                      {imageFile ? 'Change Image' : 'Upload New Image'}
                     </Button>
                     <p className="text-xs text-muted-foreground mt-2">
                       JPEG or PNG, max 2MB
@@ -273,13 +308,13 @@ export default function EditProfile() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="full_name">
+                  <Label htmlFor="name">
                     Full Name <span className="text-destructive">*</span>
                   </Label>
                   <Input
-                    id="full_name"
-                    value={formData.full_name}
-                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
                   />
                 </div>
@@ -303,12 +338,25 @@ export default function EditProfile() {
                   <Label htmlFor="specialization">
                     Specialization <span className="text-destructive">*</span>
                   </Label>
-                  <Input
+                  <select
                     id="specialization"
                     value={formData.specialization}
                     onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
                     required
-                  />
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select specialization...</option>
+                    <option value="General Dentistry">General Dentistry</option>
+                    <option value="Orthodontics">Orthodontics</option>
+                    <option value="Periodontics">Periodontics</option>
+                    <option value="Endodontics">Endodontics</option>
+                    <option value="Prosthodontics">Prosthodontics</option>
+                    <option value="Oral Surgery">Oral Surgery</option>
+                    <option value="Pediatric Dentistry">Pediatric Dentistry</option>
+                    <option value="Cosmetic Dentistry">Cosmetic Dentistry</option>
+                    <option value="Implant Dentistry">Implant Dentistry</option>
+                    <option value="Restorative Dentistry">Restorative Dentistry</option>
+                  </select>
                 </div>
 
                 <div className="space-y-2">
@@ -319,39 +367,31 @@ export default function EditProfile() {
                     min="0"
                     max="50"
                     value={formData.years_of_experience}
-                    onChange={(e) => setFormData({ ...formData, years_of_experience: parseInt(e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, years_of_experience: parseInt(e.target.value) || 0 })}
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="education">Education</Label>
-                <Input
-                  id="education"
-                  value={formData.education}
-                  onChange={(e) => setFormData({ ...formData, education: e.target.value })}
-                  placeholder="e.g., DDS from Harvard School of Dental Medicine"
-                />
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="clinic_address">Clinic Address</Label>
-                <Input
-                  id="clinic_address"
-                  value={formData.clinic_address}
-                  onChange={(e) => setFormData({ ...formData, clinic_address: e.target.value })}
-                  placeholder="e.g., 123 Dental St, Boston, MA"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="contact_info">Contact Information</Label>
-                <Input
-                  id="contact_info"
-                  value={formData.contact_info}
-                  onChange={(e) => setFormData({ ...formData, contact_info: e.target.value })}
-                  placeholder="e.g., +1 (555) 123-4567"
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="education">Education</Label>
+                  <Input
+                    id="education"
+                    value={formData.education}
+                    onChange={(e) => setFormData({ ...formData, education: e.target.value })}
+                    placeholder="e.g., DDS from Harvard School of Dental Medicine"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -365,42 +405,29 @@ export default function EditProfile() {
                 />
               </div>
 
-              <div className="space-y-4">
-                <Label>Available Booking Times</Label>
-                <p className="text-xs text-muted-foreground">
-                  Set your available hours for each day (e.g., "09:00-17:00" or leave blank if unavailable)
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => (
-                    <div key={day} className="space-y-2">
-                      <Label htmlFor={day} className="capitalize">{day}</Label>
-                      <Input
-                        id={day}
-                        placeholder="e.g., 09:00-17:00"
-                        value={formData.available_times?.[day as keyof typeof formData.available_times] || ''}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          available_times: {
-                            ...formData.available_times,
-                            [day]: e.target.value
-                          }
-                        })}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               <div className="flex gap-3 pt-4">
-                <Button type="submit" className="flex-1" disabled={isLoading}>
-                  <Save className="w-4 h-4 mr-2" />
-                  {isLoading ? 'Saving...' : 'Save Changes'}
+                <Button
+                  type="submit"
+                  className="flex-1"
+                  disabled={!formChanged || isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      {formChanged ? 'Save Changes' : 'No Changes to Save'}
+                    </>
+                  )}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => navigate('/doctors')}
-                  disabled={isLoading}
+                  disabled={isSaving}
                 >
                   <X className="w-4 h-4 mr-2" />
                   Cancel

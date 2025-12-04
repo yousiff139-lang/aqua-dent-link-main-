@@ -5,16 +5,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Loader2, 
-  Calendar, 
-  Clock, 
-  User, 
-  FileText, 
-  Download, 
-  AlertCircle, 
-  Phone, 
-  Mail, 
+import {
+  Loader2,
+  Calendar,
+  Clock,
+  User,
+  FileText,
+  Download,
+  AlertCircle,
+  Phone,
+  Mail,
   Eye,
   CheckCircle,
   XCircle,
@@ -60,13 +60,11 @@ interface Appointment {
   dentist_notes: string;
   pdf_report_url: string;
   created_at: string;
-  medical_documents?: Array<{
-    id: string;
-    file_name: string;
-    file_url: string;
-    file_type: string;
-    description: string;
-  }>;
+  // New medical fields
+  gender?: string;
+  is_pregnant?: boolean;
+  chronic_diseases?: string;
+  documents?: any; // JSONB for uploaded files
 }
 
 const EnhancedDentistDashboard = () => {
@@ -113,7 +111,7 @@ const EnhancedDentistDashboard = () => {
 
       if (roleError || !roles) {
         console.log('No dentist role found:', roleError);
-        
+
         // Check if user is admin (admins can also access dentist dashboard)
         const { data: adminRole } = await supabase
           .from('user_roles')
@@ -134,10 +132,10 @@ const EnhancedDentistDashboard = () => {
       }
 
       setIsDentist(true);
-      
+
       // Use dentist_id from role or find/create dentist profile
       let dentistId = roles?.dentist_id;
-      
+
       if (!dentistId) {
         // If no dentist_id in role, try to find dentist by user email or create one
         const { data: existingDentist } = await (supabase as any)
@@ -145,7 +143,7 @@ const EnhancedDentistDashboard = () => {
           .select('id')
           .eq('email', user.email)
           .single();
-          
+
         if (existingDentist) {
           dentistId = existingDentist.id;
         } else {
@@ -238,7 +236,7 @@ const EnhancedDentistDashboard = () => {
             .in('id', availableDentists.map(d => d.id))
             .limit(1)
             .single();
-            
+
           if (existingDentist) {
             dentistId = existingDentist.id;
           } else {
@@ -248,7 +246,7 @@ const EnhancedDentistDashboard = () => {
               .insert(availableDentists)
               .select('id')
               .limit(1);
-              
+
             if (insertError) {
               console.error('Error inserting dentists:', insertError);
               dentistId = availableDentists[0].id; // Use first dentist as fallback
@@ -258,7 +256,7 @@ const EnhancedDentistDashboard = () => {
           }
         }
       }
-      
+
       await loadDentistData(dentistId);
     } catch (error) {
       console.error('Error checking role:', error);
@@ -295,13 +293,17 @@ const EnhancedDentistDashboard = () => {
         .from('appointments')
         .select(`
           *,
-          medical_documents (
-            id,
-            file_name,
-            file_url,
-            file_type,
-            description
-          )
+          symptoms,
+          chronic_diseases,
+          gender,
+          is_pregnant,
+          medications,
+          allergies,
+          previous_dental_work,
+          smoking,
+          chief_complaint,
+          medical_history,
+          documents
         `)
         .eq('dentist_id', dentistId)
         .order('appointment_date', { ascending: true });
@@ -356,7 +358,7 @@ const EnhancedDentistDashboard = () => {
       // @ts-ignore - Some columns will be added by migration
       const { error } = await (supabase as any)
         .from('appointments')
-        .update({ 
+        .update({
           status: newStatus,
           updated_at: new Date().toISOString()
         })
@@ -370,9 +372,9 @@ const EnhancedDentistDashboard = () => {
       });
 
       // Update local state
-      setAppointments(prev => 
-        prev.map(apt => 
-          apt.id === appointmentId 
+      setAppointments(prev =>
+        prev.map(apt =>
+          apt.id === appointmentId
             ? { ...apt, status: newStatus }
             : apt
         )
@@ -398,7 +400,7 @@ const EnhancedDentistDashboard = () => {
       // @ts-ignore - Some columns will be added by migration
       const { error } = await (supabase as any)
         .from('appointments')
-        .update({ 
+        .update({
           dentist_notes: notes,
           updated_at: new Date().toISOString()
         })
@@ -412,9 +414,9 @@ const EnhancedDentistDashboard = () => {
       });
 
       // Update local state
-      setAppointments(prev => 
-        prev.map(apt => 
-          apt.id === appointmentId 
+      setAppointments(prev =>
+        prev.map(apt =>
+          apt.id === appointmentId
             ? { ...apt, dentist_notes: notes }
             : apt
         )
@@ -517,7 +519,7 @@ const EnhancedDentistDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      
+
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -539,7 +541,7 @@ const EnhancedDentistDashboard = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -553,7 +555,7 @@ const EnhancedDentistDashboard = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -567,7 +569,7 @@ const EnhancedDentistDashboard = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -643,7 +645,7 @@ const EnhancedDentistDashboard = () => {
                             {appointment.payment_status}
                           </Badge>
                         </div>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-2" />
@@ -658,12 +660,12 @@ const EnhancedDentistDashboard = () => {
                             {appointment.patient_phone}
                           </div>
                         </div>
-                        
+
                         <p className="text-sm text-gray-700 mt-2">
                           <strong>Chief Complaint:</strong> {appointment.chief_complaint}
                         </p>
                       </div>
-                      
+
                       <div className="flex items-center space-x-2">
                         {appointment.pdf_report_url && (
                           <Button
@@ -702,7 +704,7 @@ const EnhancedDentistDashboard = () => {
               Complete patient information and medical history
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedAppointment && (
             <div className="space-y-6">
               {/* Patient Information */}
@@ -747,7 +749,7 @@ const EnhancedDentistDashboard = () => {
                     <label className="text-sm font-medium text-gray-500">Chief Complaint</label>
                     <p className="mt-1">{selectedAppointment.chief_complaint}</p>
                   </div>
-                  
+
                   <div>
                     <label className="text-sm font-medium text-gray-500">Symptoms</label>
                     <p className="mt-1">{selectedAppointment.symptoms}</p>
@@ -800,32 +802,54 @@ const EnhancedDentistDashboard = () => {
                       </p>
                     </div>
                   )}
+
+                  {/* New Medical Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                    {selectedAppointment.gender && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Gender</label>
+                        <p className="mt-1 capitalize">{selectedAppointment.gender}</p>
+                      </div>
+                    )}
+                    {selectedAppointment.is_pregnant !== undefined && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Pregnant</label>
+                        <p className="mt-1">{selectedAppointment.is_pregnant ? 'Yes' : 'No'}</p>
+                      </div>
+                    )}
+                    {selectedAppointment.chronic_diseases && (
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium text-gray-500">Chronic Diseases</label>
+                        <p className="mt-1">{selectedAppointment.chronic_diseases}</p>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
-              {/* Medical Documents */}
-              {selectedAppointment.medical_documents && selectedAppointment.medical_documents.length > 0 && (
+              {/* Uploaded Documents */}
+              {selectedAppointment.documents && Array.isArray(selectedAppointment.documents) && selectedAppointment.documents.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Medical Documents</CardTitle>
+                    <CardTitle className="flex items-center">
+                      <FileText className="h-5 w-5 mr-2" />
+                      Uploaded Documents
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-2">
-                      {selectedAppointment.medical_documents.map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 border rounded">
-                          <div className="flex items-center space-x-3">
-                            <FileText className="h-5 w-5 text-gray-400" />
-                            <div>
-                              <p className="font-medium">{doc.file_name}</p>
-                              <p className="text-sm text-gray-500">{doc.description}</p>
-                            </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {selectedAppointment.documents.map((doc: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                          <div className="flex items-center overflow-hidden">
+                            <FileText className="h-4 w-4 text-blue-500 mr-2 flex-shrink-0" />
+                            <span className="text-sm truncate" title={doc.name}>{doc.name}</span>
                           </div>
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            onClick={() => window.open(doc.file_url, '_blank')}
+                            onClick={() => window.open(doc.url, '_blank')}
                           >
-                            View
+                            <Download className="h-4 w-4" />
                           </Button>
                         </div>
                       ))}
@@ -882,7 +906,7 @@ const EnhancedDentistDashboard = () => {
                     Cancel
                   </Button>
                 </div>
-                
+
                 {selectedAppointment.pdf_report_url && (
                   <Button
                     onClick={() => downloadPDF(selectedAppointment.pdf_report_url, selectedAppointment.patient_name)}

@@ -13,6 +13,16 @@ export interface AppointmentSummaryData {
   appointmentDate: string;
   paymentMethod: 'cash' | 'card';
   bookingReference?: string;
+  // Medical Information
+  gender?: string;
+  isPregnant?: boolean;
+  chronicDiseases?: string;
+  medicalHistory?: string;
+  medications?: string;
+  allergies?: string;
+  previousDentalWork?: string;
+  smoking?: boolean;
+  documentUrls?: string[];
 }
 
 /**
@@ -103,6 +113,138 @@ export function generateAppointmentPDF(data: AppointmentSummaryData): Uint8Array
   doc.text(symptomLines, margin + 5, yPosition);
   yPosition += symptomLines.length * lineHeight + lineHeight;
 
+  // Medical Information Section
+  checkNewPage();
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Medical Information', margin, yPosition);
+  yPosition += lineHeight;
+
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+
+  if (data.gender || data.isPregnant !== undefined || data.chronicDiseases) {
+    if (data.gender) {
+      doc.text(`Gender: ${data.gender.charAt(0).toUpperCase() + data.gender.slice(1)}`, margin + 5, yPosition);
+      yPosition += lineHeight;
+    }
+
+    if (data.isPregnant !== undefined) {
+      doc.text(`Pregnancy Status: ${data.isPregnant ? 'Pregnant' : 'Not Pregnant'}`, margin + 5, yPosition);
+      yPosition += lineHeight;
+    }
+
+    if (data.chronicDiseases) {
+      doc.text('Chronic Diseases:', margin + 5, yPosition);
+      yPosition += lineHeight;
+      const diseaseLines = doc.splitTextToSize(data.chronicDiseases, contentWidth - 15);
+      doc.text(diseaseLines, margin + 10, yPosition);
+      yPosition += diseaseLines.length * lineHeight;
+    }
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.text('No medical information provided', margin + 5, yPosition);
+    yPosition += lineHeight;
+  }
+  yPosition += lineHeight;
+
+  // Medical History Section
+  checkNewPage();
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Medical History', margin, yPosition);
+  yPosition += lineHeight;
+
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+
+  let hasAnyMedicalHistory = false;
+
+  if (data.medicalHistory) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('General History:', margin + 5, yPosition);
+    yPosition += lineHeight;
+    doc.setFont('helvetica', 'normal');
+    const historyLines = doc.splitTextToSize(data.medicalHistory, contentWidth - 15);
+    doc.text(historyLines, margin + 10, yPosition);
+    yPosition += historyLines.length * lineHeight + lineHeight * 0.5;
+    hasAnyMedicalHistory = true;
+  }
+
+  if (data.medications) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Current Medications:', margin + 5, yPosition);
+    yPosition += lineHeight;
+    doc.setFont('helvetica', 'normal');
+    const medLines = doc.splitTextToSize(data.medications, contentWidth - 15);
+    doc.text(medLines, margin + 10, yPosition);
+    yPosition += medLines.length * lineHeight + lineHeight * 0.5;
+    hasAnyMedicalHistory = true;
+  }
+
+  if (data.allergies) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Allergies:', margin + 5, yPosition);
+    yPosition += lineHeight;
+    doc.setFont('helvetica', 'normal');
+    const allergyLines = doc.splitTextToSize(data.allergies, contentWidth - 15);
+    doc.text(allergyLines, margin + 10, yPosition);
+    yPosition += allergyLines.length * lineHeight + lineHeight * 0.5;
+    hasAnyMedicalHistory = true;
+  }
+
+  if (data.previousDentalWork) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Previous Dental Work:', margin + 5, yPosition);
+    yPosition += lineHeight;
+    doc.setFont('helvetica', 'normal');
+    const dentalLines = doc.splitTextToSize(data.previousDentalWork, contentWidth - 15);
+    doc.text(dentalLines, margin + 10, yPosition);
+    yPosition += dentalLines.length * lineHeight + lineHeight * 0.5;
+    hasAnyMedicalHistory = true;
+  }
+
+  if (data.smoking !== undefined) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Smoking:', margin + 5, yPosition);
+    yPosition += lineHeight;
+    doc.setFont('helvetica', 'normal');
+    doc.text(data.smoking ? 'Yes' : 'No', margin + 10, yPosition);
+    yPosition += lineHeight + lineHeight * 0.5;
+    hasAnyMedicalHistory = true;
+  }
+
+  if (!hasAnyMedicalHistory) {
+    doc.setFont('helvetica', 'italic');
+    doc.text('No medical history provided', margin + 5, yPosition);
+    yPosition += lineHeight;
+  }
+  yPosition += lineHeight;
+
+  // Uploaded Documents Section
+  if (data.documentUrls && data.documentUrls.length > 0) {
+    checkNewPage();
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Uploaded Documents', margin, yPosition);
+    yPosition += lineHeight;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${data.documentUrls.length} document(s) uploaded:`, margin + 5, yPosition);
+    yPosition += lineHeight;
+
+    data.documentUrls.forEach((url, index) => {
+      checkNewPage(10);
+      const fileName = url.split('/').pop() || `Document ${index + 1}`;
+      doc.setTextColor(0, 0, 255); // Blue for links
+      doc.textWithLink(`${index + 1}. ${fileName}`, margin + 10, yPosition, { url });
+      doc.setTextColor(0, 0, 0); // Reset to black
+      yPosition += lineHeight;
+    });
+    yPosition += lineHeight;
+  }
+
   // Payment Information Section
   checkNewPage();
   doc.setFontSize(14);
@@ -131,6 +273,6 @@ export function generateAppointmentPDF(data: AppointmentSummaryData): Uint8Array
  * Convert PDF to Blob for Supabase Storage upload
  */
 export function pdfToBlob(pdfBytes: Uint8Array): Blob {
-  return new Blob([pdfBytes], { type: 'application/pdf' });
+  return new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
 }
 

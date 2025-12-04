@@ -1,0 +1,478 @@
+{
+    "metadata": {
+        "version": "1.0",
+        "description": "Comprehensive dental FAQ training dataset for Aqua Dent Link chatbot",
+        "categories": [
+            "booking_system",
+            "general_dentistry",
+            "common_problems",
+            "emergencies",
+            "preventive_care",
+            "cosmetic_dentistry",
+            "orthodontics",
+            "pediatric_dentistry",
+            "procedures",
+            "periodontics",
+            "endodontics",
+            "oral_surgery"
+        ],
+        "total_questions": 118,
+        "estimated_tokens": 95000
+    },
+    "booking_system": [
+        {
+            "question": "How does your booking system work?",
+            "answer": "Our AI chatbot makes booking simple! Here's how: (1) I'll ask you about your symptoms and health background, (2) Based on your needs, I'll recommend the best dentist for you, (3) You can choose from available time slots, (4) I'll collect necessary information like your gender, phone number, and medical history, (5) Once confirmed, you'll receive an email with all the details. The whole process takes just 3-5 minutes!"
+        },
+        {
+            "question": "What information do I need to provide to book an appointment?",
+            "answer": "To book an appointment, I'll need: your name and email (already from your login), your gender (for appropriate care), phone number (for confirmations), any chronic diseases or medical conditions, your dental medical history (or you can upload documents), and a description of your current symptoms or reason for visit. If you're female, I'll also ask about pregnancy as it affects treatment planning."
+        },
+        {
+            "question": "Can I book appointments 24/7?",
+            "answer": "Yes! I'm available 24/7 to help you book appointments anytime, even outside office hours. You can schedule your appointment whenever it's convenient for you, and we'll confirm it during business hours."
+        },
+        {
+            "question": "How do you choose which dentist to recommend?",
+            "answer": "I analyze your symptoms using AI to determine which dental specialty best fits your needs, then recommend top-rated dentists in that specialty. You'll see the dentist's name, specialization, and rating. If you prefer, you can also view other available dentists."
+        },
+        {
+            "question": "Can I upload my medical documents or X-rays when booking?",
+            "answer": "Absolutely! When I ask about your dental medical history, you'll have the option to upload documents like X-rays, previous treatment reports, or medical records. This helps your dentist better prepare for your visit."
+        },
+        {
+            "question": "What if I need to reschedule or cancel my appointment?",
+            "answer": "You can manage your appointments through your dashboard. Simply log in, find your upcoming appointment, and choose to reschedule or cancel. You can also contact us directly, and we'll help you."
+        },
+        {
+            "question": "Will I receive a confirmation after booking?",
+            "answer": "Yes! Once your appointment is confirmed, you'll receive an email with all the details including your dentist's name, appointment time, and what to prepare. We'll also send reminders before your appointment."
+        },
+        {
+            "question": "Can I choose a specific dentist?",
+            "answer": "Yes! While I'll recommend a dentist based on your symptoms, you can always request to see other dentists or choose a specific dentist you prefer from our list."
+        },
+        {
+            "question": "How far in advance can I book?",
+            "answer": "You can typically book appointments several weeks in advance, depending on dentist availability. I'll show you the available time slots when you're booking."
+        },
+        {
+            "question": "What happens after I book an appointment?",
+            "answer": "After booking: (1) You'll get an immediate confirmation email, (2) Your dentist will review your information and symptoms, (3) You'll receive appointment reminders, (4) You can view your appointment in your dashboard, (5) On the appointment day, just arrive a few minutes early for check-in!"
+        }
+    ],
+    "general_dentistry": [
+        {
+            "question": "How often should I brush and floss?",
+            "answer": "The American Dental Association recommends brushing your teeth at least twice a day for two minutes each time, and flossing once a day. Brushing removes most bacteria, but flossing is essential for cleaning between teeth and under the gumline where your toothbrush can't reach."
+        },
+        {
+            "question": "What type of toothbrush should I use?",
+            "answer": "Use a soft-bristled toothbrush to prevent damage to your teeth and gums. Both manual and electric toothbrushes work well, but electric toothbrushes may be easier for some people and can be more effective at removing plaque. Replace your toothbrush every 3-4 months or sooner if the bristles are worn."
+        },
+        {
+            "question": "How often should I visit the dentist?",
+            "answer": "Most adults should visit the dentist once or twice a year for check-ups and professional cleaning, even if your mouth feels healthy. Regular visits help detect problems early and prevent more serious issues. Some people at higher risk may need more frequent visits."
+        },
+        {
+            "question": "What toothpaste should I use?",
+            "answer": "Look for toothpastes with the ADA Seal of Acceptance. These always contain fluoride, which strengthens teeth and prevents decay. If you have specific concerns like sensitivity or whitening, ask your dentist to recommend a specialized toothpaste."
+        },
+        {
+            "question": "Do I really need to floss?",
+            "answer": "Yes! Flossing is essential for complete oral hygiene. It removes food and plaque from between your teeth and under the gumline that brushing can't reach. This prevents plaque from hardening into tartar, which can lead to gum disease and tooth loss. Make it a daily habit."
+        },
+        {
+            "question": "Does mouthwash help?",
+            "answer": "Mouthwash can help with cavity protection, sensitivity, and fresh breath, but it should be used in addition to brushing and flossing, not as a replacement. Your dentist can recommend the best type of mouthwash for your specific needs."
+        },
+        {
+            "question": "Why is fluoride important?",
+            "answer": "Fluoride makes teeth strong and helps prevent decay by strengthening tooth enamel and making it more resistant to acid-producing bacteria. It can even help reverse early stages of tooth decay. Most toothpastes contain fluoride, and your dentist may recommend additional fluoride treatments."
+        },
+        {
+            "question": "Are dental X-rays safe?",
+            "answer": "Yes, modern digital dental X-rays are very safe and expose you to minimal radiation. They're important because they help your dentist detect problems like cavities between teeth, infections in the jaw, and other issues that can't be seen during a regular visual exam."
+        },
+        {
+            "question": "What happens during a dental check-up?",
+            "answer": "During a check-up, your dentist will: examine your teeth and gums for signs of decay or disease, check existing dental work, possibly take X-rays, clean your teeth professionally to remove plaque and tartar, polish your teeth, and discuss any findings or recommendations with you."
+        },
+        {
+            "question": "Should I see the dentist if I don't have symptoms?",
+            "answer": "Absolutely! Many dental problems are symptomless in early stages. Regular check-ups allow your dentist to catch potential issues early, preventing more extensive and costly treatments later. Prevention is always better than treatment."
+        }
+    ],
+    "common_problems": [
+        {
+            "question": "Why are my teeth sensitive to hot or cold?",
+            "answer": "Tooth sensitivity occurs when the protective enamel thins or gums recede, exposing the underlying dentin and nerves. Common causes include: acidic foods and drinks, teeth grinding, aggressive brushing, gum disease, or whitening treatments. Try using a desensitizing toothpaste, and if sensitivity persists, see your dentist for evaluation and treatment options."
+        },
+        {
+            "question": "Why do my gums bleed when I brush?",
+            "answer": "Bleeding gums can indicate gingivitis (early gum disease) or that you're brushing too hard. Gingivitis is caused by plaque buildup and can usually be reversed with improved oral hygiene. If bleeding continues despite gentle brushing and daily flossing, schedule a dental appointment as it could progress to more serious gum disease."
+        },
+        {
+            "question": "What causes bad breath?",
+            "answer": "Chronic bad breath (halitosis) is usually caused by bacteria buildup in your mouth, particularly between teeth or on your tongue. Other causes include: poor oral hygiene, gum disease, dry mouth, certain foods (garlic, onions), tobacco use, or underlying health conditions. Practice good oral hygiene, use antibacterial mouthwash, clean your tongue, and stay hydrated. If it persists, see your dentist."
+        },
+        {
+            "question": "What is a cavity and how does it form?",
+            "answer": "A cavity is a permanently damaged area (hole) in the hard surface of your tooth. It forms when bacteria in your mouth produce acids from sugars and starches in food. These acids gradually dissolve tooth enamel, creating the cavity. Symptoms may include tooth pain, sensitivity, or visible holes. Cavities are treated with fillings."
+        },
+        {
+            "question": "Why does my tooth hurt after a filling?",
+            "answer": "Some sensitivity or mild discomfort after a filling is normal as your tooth adjusts. The dentist has removed decay and filled the area, which can temporarily irritate the tooth. This usually subsides within a few days to a week. However, if pain is severe or persists beyond 2 weeks, contact your dentist as you may need an adjustment or further treatment."
+        },
+        {
+            "question": "What is gingivitis?",
+            "answer": "Gingivitis is the early stage of gum disease, characterized by inflamed, red, and bleeding gums. It's caused by plaque buildup along the gumline. The good news is that gingivitis can often be reversed with improved brushing, daily flossing, and regular dental cleanings. If left untreated, it can progress to periodontitis, a more serious form of gum disease."
+        },
+        {
+            "question": "Can gum disease be reversed?",
+            "answer": "Gingivitis (early gum disease) can usually be reversed with proper oral hygiene and professional cleaning. However, once it progresses to periodontitis (advanced gum disease), the damage is permanent, though it can be managed and prevented from worsening. This is why early detection and treatment are crucial."
+        },
+        {
+            "question": "What should I do if my gums are swollen?",
+            "answer": "Swollen gums can indicate gum disease, infection, or irritation. Try: gentle brushing with a soft toothbrush, rinsing with warm salt water, and avoiding tobacco. If swelling persists more than a few days, is painful, or accompanied by other symptoms, schedule a dental appointment immediately."
+        },
+        {
+            "question": "Why do I have white spots on my teeth?",
+            "answer": "White spots can indicate: early tooth decay (demineralization), fluorosis (excess fluoride during tooth development), or enamel hypoplasia. They can sometimes be treated with fluoride treatments, remineralization products, or cosmetic procedures. See your dentist for proper diagnosis and treatment options."
+        },
+        {
+            "question": "What causes tooth discoloration?",
+            "answer": "Tooth discoloration can be caused by: surface stains from coffee, tea, wine, or tobacco; internal discoloration from aging, trauma, or certain medications; genetics; or excessive fluoride. Treatment options range from professional whitening to veneers, depending on the cause and severity."
+        }
+    ],
+    "emergencies": [
+        {
+            "question": "What should I do if I knock out a tooth?",
+            "answer": "This is a dental emergency! Act quickly: (1) Find the tooth and pick it up by the crown (top), not the root, (2) Rinse gently with water if dirty, don't scrub, (3) Try to re-insert it into the socket within 30 minutes if possible, (4) If you can't re-insert it, keep it moist in milk, saline, or your saliva, (5) See a dentist IMMEDIATELY, ideally within 6 hours. Time is critical for saving the tooth!"
+        },
+        {
+            "question": "Is a toothache a dental emergency?",
+            "answer": "A toothache can be an emergency depending on severity. Seek immediate care if you have: severe, unbearable pain, swelling in your face or jaw, fever, difficulty swallowing or breathing, or bleeding that won't stop. For mild toothaches, rinse with warm water, floss gently to remove debris, take over-the-counter pain relievers, and schedule a dental appointment soon."
+        },
+        {
+            "question": "What if I break or chip a tooth?",
+            "answer": "For a broken or chipped tooth: (1) Rinse your mouth with warm water, (2) Save any pieces you can find, (3) Apply a cold compress to reduce swelling, (4) Use dental wax or temporary filling material (from a pharmacy) to cover sharp edges, (5) Contact your dentist immediately. Small chips can often be smoothed out, while larger breaks may need bonding, a crown, or other treatments."
+        },
+        {
+            "question": "What is an abscess and what should I do?",
+            "answer": "A dental abscess is a painful infection filled with pus, usually at the tooth root or in the gums. Symptoms include severe toothache, swelling, fever, and bad taste. This is a serious emergency! The infection can spread. Rinse with salt water, take pain relievers, and see a dentist or emergency room IMMEDIATELY. Antibiotics and drainage may be needed."
+        },
+        {
+            "question": "My crown or filling fell out. What should I do?",
+            "answer": "If a crown or filling falls out: (1) Keep the area clean by rinsing gently, (2) Save the crown if you can, (3) You can temporarily re-cement a crown with dental cement or denture adhesive from a pharmacy, (4) Avoid chewing on that side, (5) Schedule a dental appointment as soon as possible. Don't wait too long or the tooth may shift or become damaged."
+        },
+        {
+            "question": "I'm experiencing severe jaw pain and swelling. Is this an emergency?",
+            "answer": "Yes, severe jaw pain and swelling can indicate a serious infection, abscess, or other urgent condition. Especially if accompanied by fever, difficulty swallowing, or breathing problems, this requires IMMEDIATE dental or emergency room care. Don't delay—infections can spread rapidly."
+        },
+        {
+            "question": "What if my braces wire is poking me?",
+            "answer": "If a braces wire is causing discomfort: (1) Try pushing it flat with a pencil eraser or cotton swab, (2) Cover the end with orthodontic wax or a small cotton ball, (3) If it's severely cutting your mouth or you can't fix it, contact your orthodontist for an emergency appointment. Don't try to cut the wire yourself."
+        },
+        {
+            "question": "I bit my tongue or lip badly. What should I do?",
+            "answer": "For tongue or lip injuries: (1) Clean the area gently with water, (2) Apply pressure with clean gauze or cloth to stop bleeding, (3) Use a cold compress to reduce swelling, (4) If bleeding doesn't stop after 15 minutes or the cut is deep, seek medical attention. Most minor bites heal on their own in a few days."
+        }
+    ],
+    "preventive_care": [
+        {
+            "question": "How can I prevent cavities?",
+            "answer": "To prevent cavities: (1) Brush twice daily with fluoride toothpaste for 2 minutes, (2) Floss daily between teeth, (3) Limit sugary and acidic foods and drinks, (4) Don't graze or sip sugary drinks throughout the day, (5) Drink fluoridated water, (6) Visit your dentist regularly for check-ups and cleanings, (7) Consider dental sealants if recommended. These habits significantly reduce cavity risk."
+        },
+        {
+            "question": "What are dental sealants?",
+            "answer": "Dental sealants are thin protective coatings painted on the chewing surfaces of back teeth (molars). They seal the grooves and pits where food and bacteria often get trapped, preventing cavities. Sealants are especially beneficial for children and teenagers but can help adults too. They're quick, painless to apply, and can last several years."
+        },
+        {
+            "question": "Should I use mouthguard for sports?",
+            "answer": "Absolutely! If you play contact sports (football, basketball, hockey, soccer, etc.), wearing a mouthguard is essential to protect your teeth, lips, tongue, and jaw from injury. Custom-fitted mouthguards from your dentist offer the best protection and comfort, though over-the-counter options are better than nothing."
+        },
+        {
+            "question": "How does diet affect my teeth?",
+            "answer": "Diet significantly impacts oral health. Sugary and acidic foods/drinks feed bacteria that cause cavities and erode enamel. Limit: candy, soda, juice, dried fruit, citrus, and processed snacks. Choose tooth-friendly foods: dairy (calcium), crunchy vegetables, water, lean proteins, and whole grains. If you do have sweets, consume them with meals rather than as snacks to reduce acid exposure."
+        },
+        {
+            "question": "Is carbonated water bad for my teeth?",
+            "answer": "Plain carbonated water is generally fine for teeth, though slightly more acidic than regular water. However, flavored or sweetened sparkling waters can contain citric acid and sweeteners that may erode enamel. If you drink carbonated water, choose unflavored varieties and don't sip it constantly throughout the day. Regular water is still the best choice."
+        },
+        {
+            "question": "How do I prevent gum disease?",
+            "answer": "Prevent gum disease by: (1) Brushing twice daily, especially along the gumline, (2) Flossing daily to remove plaque between teeth, (3) Using antibacterial mouthwash, (4) Not smoking or using tobacco, (5) Eating a balanced diet, (6) Managing stress and health conditions like diabetes, (7) Getting regular dental cleanings and check-ups. Early detection is key!"
+        },
+        {
+            "question": "Should I brush my tongue?",
+            "answer": "Yes! Your tongue harbors bacteria that cause bad breath and can contribute to dental problems. Brush your tongue gently from back to front each time you brush your teeth, or use a tongue scraper. This removes bacteria, food particles, and dead cells, keeping your breath fresh and mouth healthier."
+        },
+        {
+            "question": "What foods are good for my teeth?",
+            "answer": "Tooth-friendly foods include: dairy products (calcium and phosphates strengthen enamel), crunchy vegetables like carrots and celery (natural cleaning action), leafy greens (vitamins and minerals), lean proteins (phosphorus), nuts and seeds, apples and pears, and water (rinses away bacteria). These foods help strengthen teeth and promote healthy gums."
+        }
+    ],
+    "cosmetic_dentistry": [
+        {
+            "question": "How can I whiten my teeth?",
+            "answer": "Teeth whitening options include: (1) Professional in-office whitening (fastest, most dramatic results), (2) Take-home custom trays from your dentist (gradual, effective), (3) Over-the-counter whitening strips and trays (moderate results), (4) Whitening toothpastes (removes surface stains only). The best option depends on your budget, timeline, and type of discoloration. Always consult your dentist first."
+        },
+        {
+            "question": "Are whitening products safe?",
+            "answer": "Yes, when used as directed, teeth whitening products approved by dental associations are generally safe. However, they can cause temporary tooth sensitivity or gum irritation. Professional treatments supervised by a dentist are safest. Avoid overuse of over-the-counter products, and consult your dentist before starting any whitening treatment."
+        },
+        {
+            "question": "How long does teeth whitening last?",
+            "answer": "Professional teeth whitening can last from several months to 3 years, depending on your habits. Results last longer if you: avoid staining foods/drinks (coffee, tea, red wine), don't smoke, maintain excellent oral hygiene, and get touch-ups as needed. Your dentist can provide touch-up treatments to maintain your bright smile."
+        },
+        {
+            "question": "What are veneers?",
+            "answer": "Dental veneers are thin, custom-made shells (usually porcelain or composite resin) bonded to the front of your teeth to improve appearance. They can fix: discolored, chipped, misaligned, or irregularly shaped teeth, and gaps. Veneers are a popular cosmetic option that typically last 10-15 years with proper care."
+        },
+        {
+            "question": "Do veneers damage your teeth?",
+            "answer": "To place veneers, a small amount of tooth enamel must be removed to make room, which is an irreversible process. However, when done properly by an experienced dentist, this minimal preparation doesn't damage the tooth structure. Veneers actually protect and strengthen the remaining tooth. Proper care and maintenance are important for longevity."
+        },
+        {
+            "question": "What is teeth bonding?",
+            "answer": "Dental bonding uses tooth-colored composite resin to repair chips, close small gaps, improve tooth shape, or cover discoloration. It's a quick, affordable cosmetic procedure usually completed in one visit. While not as durable as veneers or crowns, bonding can last several years with good care and is easily repaired if needed."
+        },
+        {
+            "question": "Can you fix gaps between teeth?",
+            "answer": "Yes! Gaps can be fixed through: orthodontics (braces or clear aligners to close gaps permanently), veneers (cover the gap cosmetically), bonding (add material to teeth to close small gaps), or crowns. The best option depends on gap size, your overall dental health, budget, and preferences. Your dentist can recommend the ideal solution."
+        },
+        {
+            "question": "What are my options for a smile makeover?",
+            "answer": "A smile makeover can include: teeth whitening, veneers, crowns, bonding, orthodontics (braces/Invisalign), gum contouring, or implants. Your dentist will assess your teeth, discuss your goals, and create a customized treatment plan combining appropriate procedures to achieve your ideal smile. Results can be dramatic and life-changing!"
+        }
+    ],
+    "orthodontics": [
+        {
+            "question": "What age should kids get braces?",
+            "answer": "The American Association of Orthodontists recommends children have their first orthodontic evaluation by age 7. While treatment might not start until later (typically ages 9-14), early evaluation allows orthodontists to detect problems and determine the best timing for treatment. Some conditions benefit from early intervention, while others are best treated after all permanent teeth have erupted."
+        },
+        {
+            "question": "What's the difference between braces and Invisalign?",
+            "answer": "Traditional braces use metal or ceramic brackets and wires fixed to teeth, while Invisalign uses clear, removable plastic aligners. Braces: work for complex cases, can't be removed, more affordable, visible. Invisalign: nearly invisible, removable for eating/cleaning, more comfortable, works for mild to moderate cases, requires discipline. Your orthodontist can recommend the best option for your situation."
+        },
+        {
+            "question": "How long does orthodontic treatment take?",
+            "answer": "Treatment time varies widely depending on the complexity of your case. Average treatment is 18-24 months, but simple cases may take 6-12 months while complex cases could take 3+ years. Factors include: age, severity of misalignment, treatment type, and how well you follow instructions. Your orthodontist will provide an estimated timeline."
+        },
+        {
+            "question": "Will braces hurt?",
+            "answer": "You may feel some discomfort when braces are first placed and after adjustments, but it's typically mild soreness, not severe pain. Your teeth and mouth need time to adjust. Discomfort usually lasts a few days and can be managed with over-the-counter pain relievers and soft foods. Modern braces are much more comfortable than older versions."
+        },
+        {
+            "question": "Can adults get braces?",
+            "answer": "Absolutely! There's no age limit for orthodontic treatment. Many adults successfully get braces or Invisalign to straighten teeth, improve bite, or enhance their smile. Adult treatment may take slightly longer than children's, but the results are equally effective. Clear aligners and ceramic braces offer discrete options popular with adults."
+        },
+        {
+            "question": "What can I eat with braces?",
+            "answer": "Avoid hard, sticky, or chewy foods that can damage braces: popcorn, nuts, hard candy, ice, gum, caramel, bagels, whole apples/carrots. Safe foods: soft bread, rice, pasta, eggs, soft fruits, cooked vegetables, yogurt, soft cheese, fish, mashed potatoes. Cut hard fruits/vegetables into small pieces. Good nutrition is important, so find creative ways to eat balanced meals."
+        },
+        {
+            "question": "Do I need to wear a retainer after braces?",
+            "answer": "Yes! Retainers are crucial to maintain your new smile after braces. Without them, teeth will gradually shift back. You'll typically wear your retainer full-time for several months, then nightly long-term (potentially for life). Follow your orthodontist's instructions carefully to protect your investment and keep your smile straight."
+        }
+    ],
+    "pediatric_dentistry": [
+        {
+            "question": "When should my child first see a dentist?",
+            "answer": "The American Academy of Pediatric Dentistry recommends children have their first dental visit by their first birthday or when their first tooth appears, whichever comes first. Early visits help detect problems early, establish good oral hygiene habits, apply fluoride if needed, and help children become comfortable with dental visits."
+        },
+        {
+            "question": "How do I care for my baby's teeth?",
+            "answer": "For babies: (1) Clean gums with a soft, damp cloth after feedings even before teeth emerge, (2) Once teeth appear, brush gently twice daily with a soft infant toothbrush and water (or tiny smear of fluoride toothpaste), (3) Never put baby to bed with a bottle (causes baby bottle tooth decay), (4) Start dental visits by age 1. Building good habits early sets the foundation for lifelong oral health."
+        },
+        {
+            "question": "When do kids lose baby teeth?",
+            "answer": "Children typically start losing baby teeth around age 6-7, beginning with the lower front teeth. The process continues until about age 12-13 when all baby teeth are replaced by permanent teeth. The order and timing varies, but if your child's pattern differs significantly from peers or experiences problems, consult a dentist."
+        },
+        {
+            "question": "Should my child use fluoride toothpaste?",
+            "answer": "Yes, fluoride toothpaste is recommended for children of all ages. For children under 3, use a smear the size of a rice grain. For ages 3-6, use a pea-sized amount. Supervise brushing to ensure they spit out the toothpaste (don't swallow) and use the right amount. Fluoride strengthens developing teeth and prevents cavities."
+        },
+        {
+            "question": "Is thumb-sucking harmful?",
+            "answer": "Thumb-sucking is normal for babies and young children. Most children stop on their own between ages 2-4. However, prolonged thumb-sucking beyond age 4-5 can affect tooth alignment and jaw development. If your child continues past age 4 or you notice dental changes, consult your dentist for strategies to help them stop."
+        },
+        {
+            "question": "Does my child need sealants?",
+            "answer": "Dental sealants are highly recommended for children's permanent molars, which typically emerge around ages 6 and 12. Sealants protect the deep grooves in back teeth where cavities most often form. They're quick, painless, and can prevent 80% of cavities in back teeth. Ask your dentist if sealants are right for your child."
+        },
+        {
+            "question": "What if my child is afraid of the dentist?",
+            "answer": "Dental anxiety is common in children. Help by: (1) Starting visits early to build familiarity, (2) Using positive language (avoid words like 'pain' or 'shot'), (3) Reading books about dental visits, (4) Staying calm yourself, (5) Praising bravery, (6) Choosing a pediatric dentist experienced with anxious children. Many pediatric dental offices use child-friendly techniques and environments."
+        }
+    ],
+    "procedures": [
+        {
+            "question": "What is a root canal?",
+            "answer": "A root canal is a procedure to save a badly decayed or infected tooth. The dentist removes the infected pulp (nerve and blood vessels) from inside the tooth, cleans and disinfects the canals, then fills and seals them. Despite their reputation, modern root canals are relatively comfortable with anesthesia and can save your natural tooth, avoiding extraction."
+        },
+        {
+            "question": "How long does a crown last?",
+            "answer": "Dental crowns typically last 5-15 years, though with excellent care, they can last 20+ years. Longevity depends on: material used, tooth location, your oral hygiene, grinding/clenching habits, and diet. To maximize crown life: brush and floss carefully around it, avoid hard foods, wear a nightguard if you grind your teeth, and see your dentist regularly."
+        },
+        {
+            "question": "What is a dental implant?",
+            "answer": "A dental implant is a permanent replacement for a missing tooth. It consists of a titanium post surgically placed in your jawbone (acts like an artificial root), an abutment (connector), and a crown (visible tooth). Implants look, feel, and function like natural teeth, are very durable (95%+ success rate), and can last a lifetime with proper care."
+        },
+        {
+            "question": "Are dental implants painful?",
+            "answer": "The implant procedure is performed under local anesthesia, so you won't feel pain during surgery. Afterward, you may experience mild to moderate discomfort, swelling, and bruising for a few days, manageable with over-the-counter or prescribed pain medication. Most patients report less discomfort than expected and return to normal activities quickly."
+        },
+        {
+            "question": "What is the difference between a filling and a crown?",
+            "answer": "Fillings repair small to moderate cavities by filling the hole with composite resin, amalgam, or other materials. Crowns cover the entire visible portion of a severely damaged, weak, or heavily filled tooth like a cap, providing strength and protection. Crowns are needed when a tooth has too much damage for a filling alone."
+        },
+        {
+            "question": "What are wisdom teeth and do they need to be removed?",
+            "answer": "Wisdom teeth are the third set of molars that typically emerge in late teens or early twenties. They're often removed because: there's not enough room (causing crowding, impaction), they're difficult to clean (increasing decay/infection risk), they're impacted (growing at wrong angles), or they're causing pain/problems. Not everyone needs them removed—your dentist will evaluate and recommend."
+        },
+        {
+            "question": "Is teeth extraction painful?",
+            "answer": "During extraction, you'll receive local anesthesia so you won't feel pain, though you may feel pressure. After the numbness wears off, you'll experience some discomfort, swelling, and bleeding for a few days. Follow your dentist's post-extraction care instructions (rest, ice packs, soft foods, avoid straws) and take prescribed pain medication. Most heal well within a week."
+        },
+        {
+            "question": "What is a dental bridge?",
+            "answer": "A dental bridge is a fixed prosthetic device that replaces one or more missing teeth. It's bridged between two crowned teeth on either side of the gap. Bridges restore your ability to chew, maintain face shape, prevent remaining teeth from shifting, and improve appearance. With good care, bridges can last 10+ years."
+        },
+        {
+            "question": "What is a dental cleaning?",
+            "answer": "A dental cleaning (prophylaxis) is a professional procedure where a hygienist removes plaque, tartar, and stains from your teeth using specialized tools. The process includes: scaling (removing buildup), polishing (smoothing tooth surfaces), and fluoride treatment. Regular cleanings every 6 months prevent cavities and gum disease, and allow early detection of problems."
+        },
+        {
+            "question": "What are dentures?",
+            "answer": "Dentures are removable prosthetic devices that replace missing teeth. Full dentures replace all teeth in the upper or lower jaw, while partial dentures replace some teeth. Modern dentures look natural and restore eating and speaking ability. They require daily cleaning and periodic adjustments. Dental implants can also support dentures for better stability."
+        }
+    ],
+    "periodontics": [
+        {
+            "question": "What is periodontal disease?",
+            "answer": "Periodontal disease (gum disease) is an infection of the tissues that support your teeth, caused by plaque bacteria. It progresses from gingivitis (inflamed, bleeding gums) to periodontitis (bone and tissue loss). Symptoms include: red, swollen, bleeding gums, receding gums, loose teeth, persistent bad breath, and tooth sensitivity. Without treatment, it can lead to tooth loss."
+        },
+        {
+            "question": "What causes gum disease?",
+            "answer": "Gum disease is primarily caused by plaque buildup on teeth and gums. Risk factors include: poor oral hygiene, smoking, genetics, diabetes, certain medications, hormonal changes (pregnancy, menopause), stress, grinding teeth, and poor nutrition. The bacteria in plaque produce toxins that inflame and destroy gum tissue and bone."
+        },
+        {
+            "question": "What is scaling and root planing?",
+            "answer": "Scaling and root planing is a deep cleaning procedure for treating gum disease. Scaling removes plaque and tartar from above and below the gumline. Root planing smooths the tooth roots to help gums reattach and prevent bacteria buildup. It's usually done under local anesthesia in sections over multiple visits. This is often the first treatment for periodontitis."
+        },
+        {
+            "question": "Do I need gum surgery?",
+            "answer": "Gum surgery may be needed if you have advanced periodontitis that hasn't responded to scaling and root planing. Surgical options include: flap surgery (cleaning deep pockets), bone grafts (regenerating lost bone), soft tissue grafts (covering exposed roots), or guided tissue regeneration. Your periodontist will evaluate and recommend the best approach based on disease severity."
+        },
+        {
+            "question": "What is gum recession?",
+            "answer": "Gum recession occurs when gum tissue pulls away from teeth, exposing more of the tooth or root. Causes include: aggressive brushing, gum disease, genetics, grinding teeth, tobacco use, or misaligned teeth. Recession can lead to sensitivity, root decay, and aesthetic concerns. Treatment options include: improving oral hygiene, gum grafting surgery, or addressing underlying causes."
+        },
+        {
+            "question": "Can receding gums grow back?",
+            "answer": "Unfortunately, receded gums won't grow back on their own. However, you can prevent further recession by: using a soft toothbrush and gentle brushing technique, treating gum disease, quitting smoking, and wearing a nightguard if you grind your teeth. For severe recession, gum graft surgery can cover exposed roots and restore gum tissue."
+        },
+        {
+            "question": "How is gum disease treated?",
+            "answer": "Gum disease treatment depends on severity: (1) Early gingivitis: Professional cleaning, improved home care (brushing, flossing), antibacterial mouthwash. (2) Moderate periodontitis: Scaling and root planing, possible antibiotics. (3) Advanced periodontitis: Gum surgery, bone grafts, tooth extraction if necessary. Regular follow-up cleanings are essential to prevent recurrence."
+        },
+        {
+            "question": "What is a gum graft?",
+            "answer": "A gum graft is a surgical procedure to cover exposed tooth roots caused by gum recession. The periodontist takes tissue from your palate or uses donor tissue and attaches it to the receded area. Benefits include: reduced sensitivity, improved appearance, protection from root decay, and prevention of further recession. Recovery takes 1-2 weeks with manageable discomfort."
+        },
+        {
+            "question": "What are signs I need to see a periodontist?",
+            "answer": "See a periodontist if you have: bleeding gums (even during brushing/flossing), red, swollen, or tender gums, gums pulling away from teeth, persistent bad breath, loose or separating teeth, changes in bite or denture fit, or pus between teeth and gums. These are signs of periodontal disease requiring specialized treatment. Early intervention prevents tooth loss."
+        },
+        {
+            "question": "Is gum disease linked to other health problems?",
+            "answer": "Yes! Research links periodontal disease to several systemic conditions: heart disease and stroke (oral bacteria may enter bloodstream), diabetes (gum disease makes blood sugar harder to control), respiratory disease, rheumatoid arthritis, pregnancy complications (premature birth, low birth weight), and Alzheimer's disease. Maintaining healthy gums benefits overall health."
+        }
+    ],
+    "endodontics": [
+        {
+            "question": "What does an endodontist do?",
+            "answer": "An endodontist is a dentist who specializes in treating the inside of teeth (pulp and root canals). They have 2-3 years of additional training beyond dental school in diagnosing tooth pain and performing root canal therapy. They use advanced technology like microscopes and 3D imaging to save teeth that would otherwise need extraction. See an endodontist for complex root canal cases or retreatments."
+        },
+        {
+            "question": "When do I need a root canal?",
+            "answer": "You may need a root canal if you have: severe, persistent toothache, prolonged sensitivity to hot/cold, tooth darkening/discoloration, swollen or tender gums near a tooth, a pimple-like bump on your gums, or a cracked/chipped tooth with pulp exposure. These indicate infected or inflamed tooth pulp. A root canal removes the infection, relieves pain, and saves your natural tooth."
+        },
+        {
+            "question": "How long does a root canal take?",
+            "answer": "Most root canals are completed in 1-2 appointments, each lasting 60-90 minutes. Simple cases (front teeth with one canal) may take one visit. Molars with multiple canals or complex anatomy may require two visits. The endodontist will: numb the area, place a rubber dam, remove infected pulp, clean and shape canals, fill and seal them, and place a temporary filling. A permanent crown is placed later."
+        },
+        {
+            "question": "Does a root canal hurt?",
+            "answer": "Modern root canals are relatively comfortable with local anesthesia—you shouldn't feel pain during the procedure, similar to getting a filling. Most discomfort comes from the infection before treatment. After the procedure, you may have mild soreness for a few days, manageable with over-the-counter pain relievers. Root canals relieve pain, they don't cause it!"
+        },
+        {
+            "question": "What is a root canal retreatment?",
+            "answer": "Root canal retreatment is needed when a previous root canal fails to heal or becomes reinfected. Reasons include: narrow or curved canals missed in first treatment, complicated canal anatomy, delayed crown placement allowing reinfection, or new decay. The endodontist removes the old filling material, cleans the canals thoroughly, and reseals them. Success rate is 70-90%."
+        },
+        {
+            "question": "What is an apicoectomy?",
+            "answer": "An apicoectomy (root-end surgery) is a minor surgical procedure when a root canal or retreatment doesn't fully resolve infection at the tooth root tip. The endodontist: makes a small gum incision, removes infected tissue and the root tip, seals the remaining root, and sutures the gum. It's performed under local anesthesia with minimal discomfort. This gives the tooth another chance to heal and be saved."
+        },
+        {
+            "question": "Can a tooth that had a root canal get infected again?",
+            "answer": "Yes, though uncommon. A root canal-treated tooth can become reinfected if: bacteria re-enter through a crack, delayed crown placement allows decay, salivary contamination occurs, or complex anatomy had areas that couldn't be cleaned. Symptoms include: pain, swelling, tenderness, or a recurring pimple on the gum. Retreatment or apicoectomy is usually needed. Placing a crown promptly reduces reinfection risk."
+        },
+        {
+            "question": "What happens if I don't get a root canal?",
+            "answer": "Without treatment, an infected tooth will worsen, leading to: severe pain, abscess formation (pus-filled infection), facial swelling, bone loss around the tooth root, tooth loss, and potential spread of infection to surrounding tissues or bloodstream (rare but serious). The infection won't heal on its own. Your options are root canal treatment or extraction. Saving your natural tooth is almost always preferable."
+        },
+        {
+            "question": "How successful are root canals?",
+            "answer": "Root canals have a high success rate of 85-97%, with most teeth lasting a lifetime after treatment. Success depends on: tooth location, infection severity, canal complexity, and whether a crown is placed afterward. Molars have slightly lower success rates due to multiple canals. Following post-treatment instructions and getting a permanent crown promptly maximize success. Even if retreatment is needed, the tooth can often still be saved."
+        },
+        {
+            "question": "Do I need a crown after a root canal?",
+            "answer": "Yes, a crown is usually recommended after a root canal, especially for back teeth (molars, premolars). Root canal treatment removes the tooth's blood supply, making it more brittle and prone to fracture. A crown protects and strengthens the tooth, allowing it to function normally for years. Front teeth may only need a filling if minimal tooth structure was removed. Get the crown placed within a few months of root canal completion."
+        }
+    ],
+    "oral_surgery": [
+        {
+            "question": "What does an oral surgeon do?",
+            "answer": "An oral and maxillofacial surgeon is a dental specialist who performs surgical procedures of the mouth, jaws, face, and neck. They have 4-6 years of surgical training beyond dental school. Common procedures include: wisdom teeth removal, dental implants, jaw surgery, facial trauma repair, TMJ treatment, cleft lip/palate repair, oral cancer surgery, and complex tooth extractions. They can provide various sedation options."
+        },
+        {
+            "question": "Why do wisdom teeth need to be removed?",
+            "answer": "Wisdom teeth (third molars) often need removal because: there's insufficient space (causing impaction), they're growing at wrong angles (damaging adjacent teeth), they cause recurrent infections (pericoronitis), they're difficult to clean (high decay risk), they cause crowding of other teeth, or they have cysts/tumors around them. Early removal (late teens/early 20s) is easier with faster recovery. Not everyone needs wisdom teeth removed—your dentist will evaluate with X-rays."
+        },
+        {
+            "question": "What is wisdom teeth recovery like?",
+            "answer": "Wisdom teeth removal recovery typically takes 3-7 days. Expect: swelling and bruising (peaks day 2-3), mild discomfort (manageable with pain medication), limited jaw opening, possible numbness (usually temporary), and dietary restrictions (soft foods for several days). Important: avoid smoking, using straws, vigorous rinsing, or hard foods. Most people return to normal activities in a few days. Follow post-op instructions carefully to prevent complications like dry socket."
+        },
+        {
+            "question": "What is dry socket?",
+            "answer": "Dry socket (alveolar osteitis) is a painful complication after tooth extraction where the blood clot dislodges or dissolves prematurely, exposing bone and nerves. It occurs in 2-5% of extractions, more commonly with wisdom teeth. Symptoms (2-4 days post-extraction): severe pain, bad breath/taste, visible bone in socket. Risk factors: smoking, poor oral hygiene, birth control pills. Treatment involves socket cleaning and medicated dressing. Prevention: avoid smoking, straws, and vigorous rinsing."
+        },
+        {
+            "question": "What are impacted wisdom teeth?",
+            "answer": "Impacted wisdom teeth are blocked from erupting normally, remaining fully or partially trapped in the jawbone or gums. Types include: soft tissue impaction (covered by gum), partial bony impaction (partially in bone), or complete bony impaction (fully in bone). They can grow sideways, angled, or remain horizontal. Impacted wisdom teeth can cause: pain, infection, damage to adjacent teeth, cysts, or crowding. Removal is often recommended."
+        },
+        {
+            "question": "What is bone grafting?",
+            "answer": "Dental bone grafting is a surgical procedure to rebuild or augment jawbone that has deteriorated due to tooth loss, gum disease, or trauma. The surgeon places bone material (from your body, donor, animal, or synthetic) in the deficient area to stimulate new bone growth. It's often needed before dental implants to provide adequate bone support. Healing takes 3-6 months before implant placement."
+        },
+        {
+            "question": "What is TMJ surgery?",
+            "answer": "TMJ (temporomandibular joint) surgery treats severe jaw joint disorders that don't respond to conservative treatments. Procedures include: arthrocentesis (flushing the joint), arthroscopy (minimally invasive joint repair), or open joint surgery (for severe damage). Surgery is considered only after other treatments fail: medications, physical therapy, oral appliances, lifestyle changes. Your oral surgeon will determine if surgery is appropriate based on imaging and symptoms."
+        },
+        {
+            "question": "What should I know about sedation dentistry?",
+            "answer": "Sedation options for oral surgery include: (1) Local anesthesia only (numbing), (2) Nitrous oxide (laughing gas—mild relaxation, stay awake), (3) Oral sedation (pills—drowsy but conscious), (4) IV sedation (deeper sedation, limited memory), (5) General anesthesia (completely unconscious). Choice depends on: procedure complexity, anxiety level, health conditions, and preference. Oral surgeons are trained in anesthesia safety. You'll need someone to drive you home after sedation."
+        },
+        {
+            "question": "How long does it take to recover from jaw surgery?",
+            "answer": "Orthognathic (jaw) surgery recovery varies by procedure complexity. Initial recovery: 2-4 weeks off work/school, swelling peaks at 2-3 days, pain managed with medication, liquid/soft diet for 4-6 weeks, limited jaw opening initially. Full healing: bones fuse in 6-12 weeks, complete recovery takes several months. You may have temporary numbness, difficulty speaking/eating, and jaw stiffness. Follow surgeon's instructions, attend all appointments, and be patient—results are worth it!"
+        },
+        {
+            "question": "What is a frenectomy?",
+            "answer": "A frenectomy is a simple surgical procedure to remove or modify a frenum—the small tissue fold connecting lips to gums or tongue to mouth floor. Indications include: tongue-tie (limiting speech/eating), lip-tie (causing gap between front teeth), or gum recession. The procedure takes 15-30 minutes under local anesthesia, with minimal discomfort. For infants with tongue-tie, it can immediately improve breastfeeding. Laser frenectomy offers faster healing with less bleeding."
+        }
+    ]
+}

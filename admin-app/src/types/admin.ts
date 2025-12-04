@@ -80,6 +80,16 @@ export interface AdminAnalyticsResponse {
   };
 }
 
+export interface DayAvailability {
+  id?: string;
+  dentist_id?: string;
+  day_of_week: number; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  start_time: string; // Format: "HH:MM" (24-hour)
+  end_time: string; // Format: "HH:MM" (24-hour)
+  slot_duration_minutes: number; // Duration of each appointment slot
+  is_available: boolean;
+}
+
 export interface CreateDentistPayload {
   name: string;
   email: string;
@@ -88,6 +98,7 @@ export interface CreateDentistPayload {
   years_of_experience?: number;
   bio?: string;
   education?: string;
+  availability?: DayAvailability[]; // Optional weekly availability schedule
 }
 
 export interface CreateDentistResponse {

@@ -57,38 +57,76 @@ export class DentistsRepository {
     offset?: number;
   }): Promise<Dentist[]> {
     try {
-      let query = supabase
-        .from('dentists')
-        .select(`
-          *,
-          profile:profiles!inner(full_name, email, phone)
-        `)
-        .order('rating', { ascending: false });
-
-      if (filters?.specialization) {
-        query = query.eq('specialization', filters.specialization);
-      }
-
-      if (filters?.min_rating) {
-        query = query.gte('rating', filters.min_rating);
-      }
+      // 1. Fetch profiles with role 'dentist'
+      let profilesQuery = supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'dentist')
+        .order('created_at', { ascending: false });
 
       if (filters?.limit) {
-        query = query.limit(filters.limit);
+        profilesQuery = profilesQuery.limit(filters.limit);
       }
 
       if (filters?.offset) {
-        query = query.range(
+        profilesQuery = profilesQuery.range(
           filters.offset,
           filters.offset + (filters.limit || 20) - 1
         );
       }
 
-      const { data, error } = await query;
+      const { data: profiles, error: profilesError } = await profilesQuery;
 
-      if (error) throw error;
+      if (profilesError) throw profilesError;
+      if (!profiles || profiles.length === 0) return [];
 
-      return (data as Dentist[]) || [];
+      // 2. Fetch dentist details for these profiles
+      const profileIds = profiles.map(p => p.id);
+
+      let dentistsQuery = supabase
+        .from('dentists')
+        .select('*')
+        .in('id', profileIds);
+
+      const { data: dentistRecords, error: dentistsError } = await dentistsQuery;
+
+      if (dentistsError) throw dentistsError;
+
+      const dentistMap = new Map((dentistRecords || []).map(d => [d.id, d]));
+
+      // 3. Merge and Map
+      let results = profiles.map((profile: any) => {
+        const dentistData = dentistMap.get(profile.id) || {};
+
+        return {
+          ...dentistData,
+          id: profile.id,
+          specialization: dentistData.specialization || 'General Dentistry',
+          rating: dentistData.rating || 5.0,
+          years_of_experience: dentistData.years_of_experience || 0,
+          bio: dentistData.bio || '',
+          education: dentistData.education || '',
+          image_url: dentistData.image_url || dentistData.profile_picture,
+          profile: {
+            full_name: profile.full_name,
+            email: profile.email,
+            phone: profile.phone
+          }
+        } as Dentist;
+      });
+
+      // 4. Apply filters in memory
+      if (filters?.specialization) {
+        const specialization = filters.specialization;
+        results = results.filter(d => d.specialization === specialization);
+      }
+
+      if (filters?.min_rating !== undefined) {
+        const minRating = filters.min_rating;
+        results = results.filter(d => (d.rating || 0) >= minRating);
+      }
+
+      return results;
     } catch (error) {
       logger.error('Failed to find dentists', { filters, error });
       throw AppError.internal('Failed to fetch dentists');
