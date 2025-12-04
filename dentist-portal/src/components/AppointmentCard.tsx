@@ -2,7 +2,7 @@ import { Appointment, AppointmentStatus } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, User, CreditCard, CheckCircle, CalendarClock, Mail, Phone, FileText, Download, X } from 'lucide-react';
+import { Calendar, Clock, User, CreditCard, CheckCircle, CalendarClock, Mail, Phone, FileText, FileImage, Download, X } from 'lucide-react';
 import { format, parseISO, isFuture } from 'date-fns';
 
 import { PrivateNotes } from './PrivateNotes';
@@ -12,6 +12,7 @@ interface AppointmentCardProps {
   onMarkComplete: (appointment: Appointment) => void;
   onReschedule: (appointment: Appointment) => void;
   onCancel?: (appointment: Appointment) => void;
+  onViewXray?: (appointment: Appointment) => void;
   onUpdateNotes?: (appointmentId: string, notes: string) => Promise<void>;
   isProcessing?: boolean;
 }
@@ -21,6 +22,7 @@ export const AppointmentCard = ({
   onMarkComplete,
   onReschedule,
   onCancel,
+  onViewXray,
   onUpdateNotes,
   isProcessing = false,
 }: AppointmentCardProps) => {
@@ -208,6 +210,21 @@ export const AppointmentCard = ({
             />
           </div>
 
+          {/* View X-Rays Button - Shows if appointment has X-rays */}
+          {onViewXray && (
+            <div className="border-t pt-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onViewXray(appointment)}
+                className="w-full bg-teal-50 hover:bg-teal-100 text-teal-700 border-teal-300"
+              >
+                <FileImage className="h-4 w-4 mr-2" />
+                View X-Rays & Analysis
+              </Button>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex items-center gap-2 pt-2 border-t">
             {showCompleteButton && (
@@ -265,18 +282,16 @@ export const AppointmentCard = ({
                     import.meta.env.VITE_SUPABASE_ANON_KEY
                   );
 
-                  // Fetch health information
-                  const { data: healthInfo } = await supabase
-                    .from('appointment_health_info')
+                  // Fetch health information and documents from appointment_medical_info
+                  const { data: medicalInfo } = await supabase
+                    .from('appointment_medical_info')
                     .select('*')
                     .eq('appointment_id', apt.id)
                     .single();
 
-                  // Fetch medical documents
-                  const { data: documents } = await supabase
-                    .from('medical_documents')
-                    .select('*')
-                    .eq('appointment_id', apt.id);
+                  // Use medical info as health info and extract documents
+                  const healthInfo = medicalInfo;
+                  const documents = medicalInfo?.documents || [];
 
                   // Create a printable window
                   const printWindow = window.open('', '_blank');

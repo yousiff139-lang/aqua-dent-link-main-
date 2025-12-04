@@ -1491,13 +1491,25 @@ export class ChatbotService {
       if (context.documentUrls && context.documentUrls.length > 0) {
         const documentInserts = context.documentUrls.map(url => {
           const fileName = url.split('/').pop() || 'uploaded_document';
+          const lowerFileName = fileName.toLowerCase();
+          // Detect if it's an X-ray based on filename or extension
+          const isXray = lowerFileName.includes('xray') ||
+            lowerFileName.includes('x-ray') ||
+            lowerFileName.includes('radiograph') ||
+            lowerFileName.endsWith('.dcm') ||
+            lowerFileName.endsWith('.dicom');
+          const fileExt = fileName.split('.').pop()?.toUpperCase() || 'PNG';
+
           return {
             appointment_id: appointment.id,
             patient_id: user.id,
             file_name: fileName,
             file_url: url,
-            file_type: fileName.endsWith('.pdf') ? 'pdf' : 'image',
-            file_size: 0, // Unknown size from URL
+            file_type: fileName.endsWith('.pdf') ? 'application/pdf' : `image/${fileExt.toLowerCase()}`,
+            file_size_bytes: 0, // Unknown size from URL - use correct column name
+            is_xray: isXray,
+            xray_format: isXray ? fileExt : null,
+            analysis_status: isXray ? 'pending' : 'not_xray'
           };
         });
 

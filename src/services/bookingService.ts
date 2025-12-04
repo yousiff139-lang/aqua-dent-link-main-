@@ -456,6 +456,9 @@ export class BookingService {
         uploadedAt: new Date(),
       };
 
+      // Note: Documents are stored via appointment_medical_info.documents JSONB field
+      // The file is uploaded to storage and returned for the caller to handle
+
       return {
         success: true,
         document: documentRef,

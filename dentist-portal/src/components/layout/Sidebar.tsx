@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { User, Calendar, Users, LogOut, X, Code, CalendarCheck } from 'lucide-react';
+import { User, Calendar, Users, LogOut, X, Code, CalendarCheck, FileImage } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -16,6 +16,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
     { to: '/profile', icon: User, label: 'Profile' },
     { to: '/availability', icon: Calendar, label: 'Available Times' },
     { to: '/appointments', icon: CalendarCheck, label: 'Appointments' },
+    { to: '/xray-lab', icon: FileImage, label: 'X-Ray Lab' },
     { to: '/patients', icon: Users, label: 'Patients' },
     { to: '/developers', icon: Code, label: 'Developers' },
   ];

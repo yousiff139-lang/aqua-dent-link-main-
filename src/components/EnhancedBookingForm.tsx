@@ -316,7 +316,7 @@ export function EnhancedBookingForm({
   const uploadFiles = async (appointmentId: string) => {
     if (uploadedFiles.length === 0) return [];
 
-    const uploadedDocs: { name: string; url: string }[] = [];
+    const uploadedDocs: { name: string; url: string; type?: string; size?: number }[] = [];
 
     for (const file of uploadedFiles) {
       try {
@@ -338,8 +338,35 @@ export function EnhancedBookingForm({
 
         uploadedDocs.push({
           name: file.name,
-          url: urlData.publicUrl
+          url: urlData.publicUrl,
+          type: file.type,
+          size: file.size
         });
+
+        // Insert into medical_documents table so dentist portal can see documents
+        // Using correct column names from actual database schema
+        const isXray = file.type.startsWith('image/');
+        // @ts-ignore - medical_documents table exists but types are outdated
+        const { error: insertError } = await supabase
+          .from('medical_documents')
+          .insert({
+            patient_id: user?.id,
+            appointment_id: appointmentId,
+            file_name: file.name,
+            file_url: urlData.publicUrl,
+            file_type: file.type,
+            file_size_bytes: file.size,
+            is_xray: isXray,
+            xray_format: isXray ? (file.name.toLowerCase().endsWith('.dcm') ? 'DCM' : 'PNG') : null,
+            analysis_status: 'pending'
+          });
+
+        if (insertError) {
+          console.error('Error inserting into medical_documents:', insertError);
+          // Don't fail the upload, just log the error - file is still in storage
+        } else {
+          console.log('Document inserted into medical_documents table successfully');
+        }
       } catch (error) {
         console.error('Error uploading file:', error);
       }

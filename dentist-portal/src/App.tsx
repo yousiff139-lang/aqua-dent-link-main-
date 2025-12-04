@@ -9,16 +9,17 @@ import Profile from '@/pages/Profile';
 import AvailableTimes from '@/pages/AvailableTimes';
 import Patients from '@/pages/Patients';
 import Appointments from '@/pages/Appointments';
+import XRayLab from '@/pages/XRayLab';
 import Developers from '@/pages/Developers';
 import NotFound from '@/pages/NotFound';
 
 function AppContent() {
   useNetworkStatus();
-  
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      
+
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<DashboardLayout />}>
           <Route index element={<Navigate to="/profile" replace />} />
@@ -26,10 +27,11 @@ function AppContent() {
           <Route path="availability" element={<AvailableTimes />} />
           <Route path="patients" element={<Patients />} />
           <Route path="appointments" element={<Appointments />} />
+          <Route path="xray-lab" element={<XRayLab />} />
           <Route path="developers" element={<Developers />} />
         </Route>
       </Route>
-      
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n \"main,admin,dentist,backend\" -c \"blue,green,yellow,magenta\" \"npm run dev:main\" \"npm run dev:admin\" \"npm run dev:dentist\" \"npm run dev:backend\"",
+    "dev": "concurrently -n \"main,admin,dentist,backend,dental-ai\" -c \"blue,green,yellow,magenta,cyan\" \"npm run dev:main\" \"npm run dev:admin\" \"npm run dev:dentist\" \"npm run dev:backend\" \"npm run dev:dental-ai\"",
     "dev:main": "vite",
     "dev:admin": "cd admin-app && npm run dev",
     "dev:dentist": "cd dentist-portal && npm run dev",
     "dev:backend": "cd backend && npm run dev",
+    "dev:dental-ai": "cd dental-conditions-detection/backend && .venv/Scripts/activate && fastapi dev",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",

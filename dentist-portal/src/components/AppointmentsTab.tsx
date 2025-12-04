@@ -9,13 +9,15 @@ import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ErrorDisplay } from '@/components/ui/error-display';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Calendar, Clock, User, CreditCard, Filter, CheckCircle, CalendarClock, Mail, Phone, LayoutGrid, Table, Download, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Calendar, Clock, User, CreditCard, Filter, CheckCircle, CalendarClock, Mail, Phone, LayoutGrid, Table, Download, X, FileImage } from 'lucide-react';
 import { format, parseISO, isFuture } from 'date-fns';
 import { toast } from 'sonner';
 import { appointmentService } from '@/services/appointment.service';
 import { RescheduleDialog } from './RescheduleDialog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { AppointmentCard } from './AppointmentCard';
+import XRayAnalysisSection from './XRayAnalysisSection';
 
 const AppointmentsTab = () => {
   const { dentist } = useAuth();
@@ -24,6 +26,7 @@ const AppointmentsTab = () => {
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [xrayDialogOpen, setXrayDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -268,6 +271,12 @@ const AppointmentsTab = () => {
     }
   };
 
+  // Handle view X-rays
+  const handleViewXray = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setXrayDialogOpen(true);
+  };
+
   // Format phone number for display
   const formatPhoneNumber = (phone: string) => {
     // Simple formatting - can be enhanced based on requirements
@@ -408,6 +417,7 @@ const AppointmentsTab = () => {
                   onMarkComplete={handleMarkComplete}
                   onReschedule={handleReschedule}
                   onCancel={handleCancel}
+                  onViewXray={handleViewXray}
                   onUpdateNotes={handleUpdateNotes}
                   isProcessing={isProcessing}
                 />
@@ -666,6 +676,21 @@ const AppointmentsTab = () => {
         isLoading={isProcessing}
         variant="destructive"
       />
+
+      {/* X-Ray Analysis Dialog */}
+      <Dialog open={xrayDialogOpen} onOpenChange={setXrayDialogOpen}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>X-Ray Analysis</DialogTitle>
+          </DialogHeader>
+          {selectedAppointment && (
+            <XRayAnalysisSection
+              appointmentId={selectedAppointment.id}
+              patientName={selectedAppointment.patient_name}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

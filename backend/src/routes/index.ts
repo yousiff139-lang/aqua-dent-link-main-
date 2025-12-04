@@ -8,6 +8,7 @@ import realtimeRouter from './realtime.routes.js';
 import realtimeSyncRouter from './realtime-sync.routes.js';
 import { chatbotRouter } from './chatbot.routes.js';
 import { adminRouter } from './admin.routes.js';
+import xrayAnalysisRouter from './xray-analysis.routes.js';
 
 const router = Router();
 
@@ -26,6 +27,7 @@ const router = Router();
  * - /api/realtime/* - Real-time synchronization endpoints (legacy)
  * - /api/sync/* - Real-time sync service endpoints
  * - /api/chatbot/* - Chatbot conversation and PDF generation
+ * - /api/xray/* - X-ray analysis and AI detection
  * - /api/auth/dentist/login - Dentist authentication
  */
 
@@ -38,6 +40,7 @@ router.use('/realtime', realtimeRouter); // Legacy realtime routes
 router.use('/sync', realtimeSyncRouter); // Real-time sync service
 router.use('/chatbot', chatbotRouter); // Chatbot routes
 router.use('/admin', adminRouter); // Admin routes
+router.use('/xray', xrayAnalysisRouter); // X-ray analysis routes
 router.use('/', dentistRouter); // Dentist routes (includes /auth/dentist/login and /dentists/*)
 
 export default router;
