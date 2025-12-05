@@ -25,6 +25,7 @@ import DentistProfile from "./pages/DentistProfile";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancel from "./pages/PaymentCancel";
 import MyAppointments from "./pages/MyAppointments";
+import AuthCallback from "./pages/AuthCallback";
 import { PerformanceDashboard } from "./components/PerformanceDashboard";
 
 const queryClient = new QueryClient({
@@ -46,6 +47,7 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/admin" element={<ProtectedRoute><EnhancedAdmin /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
