@@ -2,20 +2,46 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logger } from '../config/logger.js';
 import { env } from '../config/env.js';
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Check if API key exists
+const apiKey = process.env.GEMINI_API_KEY || '';
+if (!apiKey) {
+    logger.warn('GEMINI_API_KEY is not set! Chatbot Q&A will not work.');
+}
 
-// Get the model
-const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
-    tools: [{ googleSearchRetrieval: {} }],
-    generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 1000,
-        topP: 0.95,
-        topK: 40,
-    },
-});
+// Initialize Gemini AI
+const genAI = new GoogleGenerativeAI(apiKey);
+
+// Use models that are available with this API key
+// gemini-2.0-flash has better rate limits than gemini-3-pro-preview on free tier
+let model: any;
+const modelNames = ['gemini-2.0-flash', 'gemini-3-pro-preview', 'gemini-pro-latest'];
+
+for (const modelName of modelNames) {
+    try {
+        model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 2000,
+                topP: 0.95,
+                topK: 40,
+            },
+        });
+        logger.info(`Gemini model initialized: ${modelName}`);
+        break;
+    } catch (error) {
+        logger.warn(`Could not initialize ${modelName}, trying next...`);
+    }
+}
+
+if (!model) {
+    logger.error('Could not initialize any Gemini model!');
+}
+
+// For compatibility with code that references modelWithSearch
+const modelWithSearch = null;
+
+
 
 export class GeminiService {
     /**
@@ -265,14 +291,28 @@ A: I'm sorry you're in discomfort! Here's what you can do while arranging to see
 **Patient Question**: ${question}
 
 **Instructions**: 
-1. Use internet search to find the most current and accurate dental information
-2. Provide a comprehensive, evidence-based answer following the response structure above
-3. Include practical advice and when to seek professional care
-4. Keep the response friendly, informative, and appropriately concise (2-4 paragraphs usually sufficient)
+1. Provide a comprehensive, evidence-based answer following the response structure above
+2. Include practical advice and when to seek professional care
+3. Keep the response friendly, informative, and appropriately concise (2-4 paragraphs usually sufficient)
+4. Use your dental knowledge to give accurate, helpful information
 
 **Your Response**:`;
 
-            const result = await model.generateContent(enhancedPrompt);
+            // Try model with search first if available
+            let result;
+            try {
+                if (modelWithSearch) {
+                    result = await modelWithSearch.generateContent(enhancedPrompt);
+                    logger.info('Used Gemini with Google Search for dental Q&A');
+                } else {
+                    result = await model.generateContent(enhancedPrompt);
+                }
+            } catch (searchError) {
+                // If search model fails, fall back to standard model
+                logger.warn('Google Search model failed, using standard model', { error: searchError });
+                result = await model.generateContent(enhancedPrompt);
+            }
+
             const response = await result.response;
             let answer = response.text();
 
@@ -290,7 +330,11 @@ A: I'm sorry you're in discomfort! Here's what you can do while arranging to see
 
             // Try a simpler fallback prompt
             try {
-                const fallbackPrompt = `You are a dental assistant. Answer this dental question concisely and helpfully: ${question}`;
+                const fallbackPrompt = `You are a friendly dental assistant chatbot. Answer this dental question in a helpful, informative way. Include practical tips and mention when someone should see a dentist.
+
+Question: ${question}
+
+Answer:`;
                 const fallbackResult = await model.generateContent(fallbackPrompt);
                 const fallbackResponse = await fallbackResult.response;
                 return fallbackResponse.text() + '\n\n---\n💬 Ask me more dental questions or type "book" to schedule an appointment!';
