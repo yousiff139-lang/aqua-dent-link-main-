@@ -36,7 +36,7 @@ const DentistProfile = () => {
     appointmentId: string;
     date: string;
     time: string;
-    paymentMethod: "stripe" | "cash";
+    paymentMethod: "card" | "cash";
     paymentStatus: "pending" | "paid";
   } | null>(null);
 
@@ -133,7 +133,7 @@ const DentistProfile = () => {
     appointmentId: string;
     date: string;
     time: string;
-    paymentMethod: "stripe" | "cash";
+    paymentMethod: "card" | "cash";
     paymentStatus: "pending" | "paid";
   }) => {
     setBookingSuccess(data);
@@ -169,7 +169,7 @@ const DentistProfile = () => {
               </span>
             </div>
             <p className="text-muted-foreground mb-6">{dentist.bio || "Experienced dental professional dedicated to providing quality care."}</p>
-            
+
             {/* Contact Information */}
             <div className="mb-6 space-y-2">
               {dentist.email && (
@@ -188,7 +188,7 @@ const DentistProfile = () => {
                 </p>
               )}
             </div>
-            
+
             <div className="grid md:grid-cols-2 gap-6 mb-6">
               {educationArray.length > 0 && (
                 <Card className="p-4">
@@ -230,7 +230,7 @@ const DentistProfile = () => {
 
         {/* Reviews section with virtual comments and animations */}
         <div className="mt-10">
-          <DentistReviews 
+          <DentistReviews
             dentistName={dentist.name}
             averageRating={dentist.rating || 4.5}
             totalReviews={dentist.reviews || 6}

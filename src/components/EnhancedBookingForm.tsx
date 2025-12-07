@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, CreditCard, Banknote, AlertCircle, Upload, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, CreditCard, Banknote, AlertCircle, Upload, X, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { CardPaymentForm, CardPaymentData } from "@/components/CardPaymentForm";
 
 // Enhanced validation schema with medical history
 const enhancedBookingFormSchema = z.object({
@@ -86,7 +87,7 @@ const enhancedBookingFormSchema = z.object({
   medicalHistory: z.string().optional(),
 
   // Payment
-  paymentMethod: z.enum(["stripe", "cash"], {
+  paymentMethod: z.enum(["card", "cash"], {
     required_error: "Please select how you would like to pay.",
     invalid_type_error: "Please select a valid payment method.",
   }),
@@ -121,7 +122,7 @@ interface EnhancedBookingFormProps {
     appointmentId: string;
     date: string;
     time: string;
-    paymentMethod: "stripe" | "cash";
+    paymentMethod: "card" | "cash";
     paymentStatus: "pending" | "paid";
   }) => void;
 }
@@ -138,10 +139,19 @@ export function EnhancedBookingForm({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isMedicalHistoryOpen, setIsMedicalHistoryOpen] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [cardData, setCardData] = useState<CardPaymentData | null>(null);
+  const [isCardValid, setIsCardValid] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { initiateCheckout, isProcessing: isStripeProcessing, error: stripeError } = useStripeCheckout();
+
+  // Handle card data changes from CardPaymentForm
+  const handleCardDataChange = (data: CardPaymentData, isValid: boolean) => {
+    setCardData(data);
+    setIsCardValid(isValid);
+  };
 
   const form = useForm<EnhancedBookingFormValues>({
     resolver: zodResolver(enhancedBookingFormSchema),
@@ -417,7 +427,7 @@ export function EnhancedBookingForm({
           previous_dental_work: data.previousDentalWork,
           cause_identified: true, // Manual booking assumes cause is identified
           status: 'upcoming',
-          payment_method: data.paymentMethod,
+          payment_method: data.paymentMethod === 'card' ? 'stripe' : data.paymentMethod,
           payment_status: 'pending',
           booking_source: 'manual', // Mark as manual booking for sync tracking
         })
@@ -511,60 +521,45 @@ export function EnhancedBookingForm({
         // Don't fail the booking if PDF generation fails
       }
 
-      // Handle payment method
-      if (data.paymentMethod === "stripe") {
-        toast({
-          title: "Redirecting to payment...",
-          description: "Please complete your payment to confirm the appointment.",
-        });
-
-        try {
-          await initiateCheckout({
-            appointmentId,
-            amount: 5000, // $50.00 in cents
-            currency: "usd",
-            dentistName,
-            patientEmail: data.patientEmail,
-            appointmentDate: format(data.date, "yyyy-MM-dd"),
-            appointmentTime: data.time,
-          });
-        } catch (stripeErr) {
-          const stripeErrorMessage = stripeErr instanceof Error
-            ? stripeErr.message
-            : "Payment initialization failed. Please try again.";
-
-          setError(stripeErrorMessage);
-
-          toast({
-            title: "Payment Error",
-            description: stripeErrorMessage,
-            variant: "destructive",
-          });
-
+      // Handle card payment processing simulation
+      if (data.paymentMethod === 'card') {
+        if (!isCardValid || !cardData) {
+          setError('Please enter valid card details');
           setIsSubmitting(false);
           return;
         }
-      } else {
-        // Cash payment - show success immediately
+
+        // Simulate payment processing (2 second delay)
+        setIsProcessingPayment(true);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        setIsProcessingPayment(false);
+
         toast({
-          title: "Appointment booked successfully!",
-          description: "Your appointment has been confirmed. Please bring payment to your appointment.",
+          title: "Payment Successful!",
+          description: `Card ending in ${cardData.lastFourDigits} was charged $50.00`,
         });
-
-        if (onSuccess) {
-          onSuccess({
-            appointmentId,
-            date: format(data.date, "yyyy-MM-dd"),
-            time: data.time,
-            paymentMethod: data.paymentMethod,
-            paymentStatus: "pending",
-          });
-        }
-
-        // Reset form after successful submission
-        form.reset();
-        setUploadedFiles([]);
       }
+
+      toast({
+        title: "Appointment booked successfully!",
+        description: data.paymentMethod === 'card'
+          ? "Your appointment has been confirmed. Payment received."
+          : "Your appointment has been confirmed. Please bring payment to your appointment.",
+      });
+
+      if (onSuccess) {
+        onSuccess({
+          appointmentId,
+          date: format(data.date, "yyyy-MM-dd"),
+          time: data.time,
+          paymentMethod: data.paymentMethod,
+          paymentStatus: data.paymentMethod === 'card' ? "paid" : "pending",
+        });
+      }
+
+      // Reset form after successful submission
+      form.reset();
+      setUploadedFiles([]);
     } catch (err: any) {
       let errorMessage = "Failed to book appointment. Please try again.";
 
@@ -1007,41 +1002,73 @@ export function EnhancedBookingForm({
                     <RadioGroup
                       onValueChange={field.onChange}
                       defaultValue={field.value}
-                      className="flex flex-col space-y-2"
+                      className="flex flex-col space-y-3"
+                      disabled={isSubmitting || isProcessingPayment}
                     >
-                      <div className="flex items-start space-x-3 space-y-0 rounded-lg border p-4 hover:bg-accent cursor-pointer">
-                        <RadioGroupItem value="cash" id="cash" className="mt-1" />
-                        <div className="flex-1">
-                          <Label htmlFor="cash" className="font-medium cursor-pointer flex items-center gap-2">
-                            <Banknote className="h-4 w-4" />
-                            Cash Payment
-                          </Label>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Pay at your appointment
-                          </p>
-                        </div>
+                      {/* Cash Option */}
+                      <div className="flex items-start space-x-3 space-y-0">
+                        <RadioGroupItem value="cash" id="enhanced-cash" />
+                        <Label
+                          htmlFor="enhanced-cash"
+                          className={cn(
+                            "flex-1 rounded-lg border p-4 cursor-pointer transition-colors",
+                            field.value === "cash" ? "border-primary bg-primary/5" : "border-input hover:bg-accent/50"
+                          )}
+                        >
+                          <div className="flex items-start gap-3">
+                            <Banknote className="h-5 w-5 text-primary mt-0.5" />
+                            <div className="flex-1">
+                              <p className="font-medium flex items-center gap-2">
+                                Cash Payment
+                                {field.value === "cash" && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                              </p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Pay at your appointment - $50.00
+                              </p>
+                            </div>
+                          </div>
+                        </Label>
                       </div>
-                      <div className="flex items-start space-x-3 space-y-0 rounded-lg border p-4 hover:bg-accent cursor-pointer">
-                        <RadioGroupItem value="stripe" id="stripe" className="mt-1" />
-                        <div className="flex-1">
-                          <Label htmlFor="stripe" className="font-medium cursor-pointer flex items-center gap-2">
-                            <CreditCard className="h-4 w-4" />
-                            Credit/Debit Card
-                          </Label>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Secure online payment with Stripe
-                          </p>
-                        </div>
+
+                      {/* Card Option */}
+                      <div className="flex items-start space-x-3 space-y-0">
+                        <RadioGroupItem value="card" id="enhanced-card" />
+                        <Label
+                          htmlFor="enhanced-card"
+                          className={cn(
+                            "flex-1 rounded-lg border p-4 cursor-pointer transition-colors",
+                            field.value === "card" ? "border-primary bg-primary/5" : "border-input hover:bg-accent/50"
+                          )}
+                        >
+                          <div className="flex items-start gap-3">
+                            <CreditCard className="h-5 w-5 text-primary mt-0.5" />
+                            <div className="flex-1">
+                              <p className="font-medium flex items-center gap-2">
+                                Card Payment
+                                {field.value === "card" && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                              </p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Pay now with Visa, MasterCard, or Amex - $50.00
+                              </p>
+                            </div>
+                          </div>
+                        </Label>
                       </div>
                     </RadioGroup>
                   </FormControl>
-                  <FormDescription>
-                    Choose how you would like to pay for your appointment ($50.00)
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* Card Payment Form - Show when card is selected */}
+            {form.watch("paymentMethod") === "card" && (
+              <CardPaymentForm
+                onCardDataChange={handleCardDataChange}
+                disabled={isSubmitting}
+                isProcessing={isProcessingPayment}
+              />
+            )}
 
             {/* Error Message */}
             {(error || stripeError) && (
@@ -1060,19 +1087,19 @@ export function EnhancedBookingForm({
             <Button
               type="submit"
               className="w-full"
-              disabled={isSubmitting || isStripeProcessing}
+              disabled={isSubmitting || isProcessingPayment || (form.watch("paymentMethod") === "card" && !isCardValid)}
             >
-              {isSubmitting || isStripeProcessing ? (
+              {isSubmitting || isProcessingPayment ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isStripeProcessing ? "Redirecting to payment..." : "Booking Appointment..."}
+                  {isProcessingPayment ? "Processing Payment..." : "Booking Appointment..."}
                 </>
               ) : (
                 <>
-                  {form.watch("paymentMethod") === "stripe" ? (
+                  {form.watch("paymentMethod") === "card" ? (
                     <>
                       <CreditCard className="mr-2 h-4 w-4" />
-                      Continue to Payment
+                      Pay $50.00 & Book
                     </>
                   ) : (
                     "Book Appointment"

@@ -12,7 +12,7 @@ interface BookingConfirmationProps {
   dentistName: string;
   date: string; // YYYY-MM-DD format
   time: string; // HH:mm format
-  paymentMethod: "stripe" | "cash";
+  paymentMethod: "card" | "stripe" | "cash";
   paymentStatus: "pending" | "paid";
 }
 
@@ -73,13 +73,16 @@ export function BookingConfirmation({
   // Use fetched details if available, otherwise use props
   const displayDate = appointmentDetails?.appointment_date || date;
   const displayTime = appointmentDetails?.appointment_time || time;
-  const displayPaymentMethod = (appointmentDetails?.payment_method || paymentMethod) as "stripe" | "cash";
+  const displayPaymentMethod = (appointmentDetails?.payment_method || paymentMethod) as "card" | "stripe" | "cash";
   const displayPaymentStatus = (appointmentDetails?.payment_status || paymentStatus) as "pending" | "paid";
   const bookingReference = appointmentDetails?.booking_reference || appointmentId;
 
+  // Normalize card/stripe to treat them the same
+  const isCardPayment = displayPaymentMethod === "card" || displayPaymentMethod === "stripe";
+
   // Format the date for display
   const formattedDate = format(new Date(displayDate), "EEEE, MMMM d, yyyy");
-  
+
   // Format the time for display
   const formattedTime = new Date(`2000-01-01T${displayTime}`).toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -134,7 +137,7 @@ export function BookingConfirmation({
           <div className="space-y-4">
             <div className="border-b pb-4">
               <h3 className="font-semibold text-lg mb-3">Appointment Details</h3>
-              
+
               {/* Booking Reference */}
               <div className="flex items-start gap-3 mb-3">
                 <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -180,9 +183,9 @@ export function BookingConfirmation({
             {/* Payment Status */}
             <div className="border-b pb-4">
               <h3 className="font-semibold text-lg mb-3">Payment Information</h3>
-              
+
               <div className="flex items-start gap-3">
-                {displayPaymentMethod === "stripe" ? (
+                {isCardPayment ? (
                   <CreditCard className="h-5 w-5 text-muted-foreground mt-0.5" />
                 ) : (
                   <Banknote className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -190,7 +193,7 @@ export function BookingConfirmation({
                 <div className="flex-1">
                   <p className="text-sm font-medium">Payment Method</p>
                   <p className="text-sm text-muted-foreground">
-                    {displayPaymentMethod === "stripe" ? "Credit/Debit Card" : "Cash Payment"}
+                    {isCardPayment ? "Credit/Debit Card" : "Cash Payment"}
                   </p>
                   <div className="mt-2">
                     {displayPaymentStatus === "paid" ? (
@@ -209,18 +212,18 @@ export function BookingConfirmation({
           </div>
 
           {/* Cash Payment Reminder */}
-          {displayPaymentMethod === "cash" && displayPaymentStatus === "pending" && (
+          {!isCardPayment && displayPaymentStatus === "pending" && (
             <Alert>
               <Banknote className="h-4 w-4" />
               <AlertDescription>
-                <strong>Important:</strong> Please remember to bring payment to your appointment. 
+                <strong>Important:</strong> Please remember to bring payment to your appointment.
                 Cash or card payment will be accepted at the dental office.
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Stripe Payment Confirmation */}
-          {displayPaymentMethod === "stripe" && displayPaymentStatus === "paid" && (
+          {/* Card Payment Confirmation */}
+          {isCardPayment && displayPaymentStatus === "paid" && (
             <Alert className="border-green-200 bg-green-50">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">

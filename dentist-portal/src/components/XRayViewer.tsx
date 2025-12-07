@@ -86,13 +86,18 @@ export default function XRayViewer({
             // Color based on confidence
             const color = getConfidenceColor(detection.confidence);
 
+            // Convert from center coordinates (AI model output) to top-left coordinates (canvas drawing)
+            // The AI model returns x,y as the CENTER of the bounding box
+            const boxX = detection.x - detection.width / 2;
+            const boxY = detection.y - detection.height / 2;
+
             ctx.strokeStyle = color;
             ctx.lineWidth = isHovered ? 3 : 2;
-            ctx.strokeRect(detection.x, detection.y, detection.width, detection.height);
+            ctx.strokeRect(boxX, boxY, detection.width, detection.height);
 
             // Fill with semi-transparent color
             ctx.fillStyle = color.replace('rgb', 'rgba').replace(')', ', 0.2)');
-            ctx.fillRect(detection.x, detection.y, detection.width, detection.height);
+            ctx.fillRect(boxX, boxY, detection.width, detection.height);
 
             // Draw label
             const label = `${detection.class} (${(detection.confidence * 100).toFixed(1)}%)`;
@@ -105,15 +110,15 @@ export default function XRayViewer({
             // Background for label
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
             ctx.fillRect(
-                detection.x,
-                detection.y - 24,
+                boxX,
+                boxY - 24,
                 textWidth + padding * 2,
                 20
             );
 
             // Label text
             ctx.fillStyle = color;
-            ctx.fillText(label, detection.x + padding, detection.y - 8);
+            ctx.fillText(label, boxX + padding, boxY - 8);
         });
 
         ctx.restore();
@@ -162,11 +167,13 @@ export default function XRayViewer({
         const x = (e.clientX - rect.left - position.x) / zoom;
         const y = (e.clientY - rect.top - position.y) / zoom;
 
-        // Check if click is within any detection
-        const clicked = detections.find(d =>
-            x >= d.x && x <= d.x + d.width &&
-            y >= d.y && y <= d.y + d.height
-        );
+        // Check if click is within any detection (using center-based coordinates)
+        const clicked = detections.find(d => {
+            const boxX = d.x - d.width / 2;
+            const boxY = d.y - d.height / 2;
+            return x >= boxX && x <= boxX + d.width &&
+                y >= boxY && y <= boxY + d.height;
+        });
 
         setHoveredDetection(clicked || null);
     };
