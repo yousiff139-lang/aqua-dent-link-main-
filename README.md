@@ -1,6 +1,22 @@
 # 🦷 DentalCare Connect
 
+<p align="center">
+  <img src="https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=white" alt="React">
+  <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Vite-5.4-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js">
+  <img src="https://img.shields.io/badge/Express-4.21-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express">
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/FastAPI-Latest-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/TailwindCSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="TailwindCSS">
+  <img src="https://img.shields.io/badge/Supabase-2.75-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase">
+  <img src="https://img.shields.io/badge/Stripe-Latest-635BFF?style=for-the-badge&logo=stripe&logoColor=white" alt="Stripe">
+  <img src="https://img.shields.io/badge/Roboflow-AI-8B5CF6?style=for-the-badge&logo=roboflow&logoColor=white" alt="Roboflow">
+</p>
+
 AI-powered dental practice management platform with patient booking, dentist portal, admin dashboard, and X-ray analysis
+
+---
 
 ## ✨ Features
 
@@ -13,7 +29,22 @@ AI-powered dental practice management platform with patient booking, dentist por
 - 📄 **PDF Export** - Download appointment summaries and diagnostic reports
 - 🎨 **Modern UI** - Beautiful glassmorphism design with smooth animations
 
-## 🚀 Quick Start
+---
+
+## � System Architecture
+
+### Booking Flow Sequence Diagram
+![Booking Sequence Diagram](docs/diagrams/booking-sequence-diagram.png)
+
+### Real-Time Availability Sync
+![Availability Sync Diagram](docs/diagrams/availability-sync-diagram.png)
+
+### Class Diagram
+![Class Diagram](docs/diagrams/class-diagram.png)
+
+---
+
+## �🚀 Quick Start
 
 ### Prerequisites
 - Node.js v18.0.0 or higher
@@ -75,6 +106,8 @@ This starts:
 - ⚙️ **Backend API**: http://localhost:3000
 - 🤖 **AI Detection**: http://localhost:8000
 
+---
+
 ## 🏗️ Project Structure
 
 ```
@@ -118,6 +151,8 @@ aqua-dent-link-main/
 └── package.json                  # Root config (runs all services)
 ```
 
+---
+
 ## 🛠️ Tech Stack
 
 ### Frontend
@@ -138,6 +173,8 @@ aqua-dent-link-main/
 - OpenAI/Gemini - Diagnostic reports
 - LangChain - AI orchestration
 
+---
+
 ## 📝 API Endpoints
 
 ### Backend API (Port 3000)
@@ -157,6 +194,8 @@ aqua-dent-link-main/
 | `POST` | `/api/v1/detect-dicom` | Process DICOM files |
 | `POST` | `/api/v1/generate-diagnostic-report` | Generate AI report |
 
+---
+
 ## 🔐 Getting API Keys
 
 ### Supabase (Required)
@@ -174,6 +213,8 @@ aqua-dent-link-main/
 2. Go to Developers → API Keys
 3. Copy publishable and secret keys
 
+---
+
 ## 👥 Authors
 
 - **Karrar Al-Mayaly**
@@ -185,4 +226,4 @@ This project is for educational purposes.
 
 ---
 
-Made with ❤️ for better dental healthcare
+<p align="center">Made with ❤️ for better dental healthcare</p>
