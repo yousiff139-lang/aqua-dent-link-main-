@@ -29,3 +29,7 @@ storage/
 *.njsproj
 *.sln
 *.sw?
+
+# Documentation files (keep only README.md in repo)
+*.md
+!README.md
