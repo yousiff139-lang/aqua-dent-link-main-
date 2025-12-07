@@ -31,20 +31,115 @@ AI-powered dental practice management platform with patient booking, dentist por
 
 ---
 
-## � System Architecture
+## 📊 System Architecture
 
 ### Booking Flow Sequence Diagram
-![Booking Sequence Diagram](docs/diagrams/booking-sequence-diagram.png)
+
+```mermaid
+sequenceDiagram
+    participant Patient
+    participant UserWebApp as User Web App
+    participant Supabase as Supabase Database
+    participant DentistPortal as Dentist Portal
+
+    Patient->>UserWebApp: Select Dentist & Date
+    UserWebApp->>Supabase: Query Available Slots (dentist_id, date)
+    Supabase-->>UserWebApp: Return Available Slots
+    UserWebApp->>Patient: Display Slots
+    Patient->>UserWebApp: Select Slot & Submit Form
+    UserWebApp->>Supabase: Create Appointment (pending)
+    Supabase-->>DentistPortal: Trigger Real-Time Event
+    DentistPortal->>Supabase: Confirm Booking
+    Supabase-->>UserWebApp: Update Status (confirmed)
+    UserWebApp->>Patient: Show Confirmation Message
+```
 
 ### Real-Time Availability Sync
-![Availability Sync Diagram](docs/diagrams/availability-sync-diagram.png)
+
+```mermaid
+sequenceDiagram
+    participant Dentist
+    participant DentistPortal as Dentist Portal
+    participant Supabase as Supabase Database
+    participant UserWebApp as User Web App
+
+    Dentist->>DentistPortal: Login & Open Scheduler
+    DentistPortal->>Supabase: Get Availability (dentist_id)
+    Supabase-->>DentistPortal: Return Current Slots
+    Dentist->>DentistPortal: Set Available Times (e.g. Mon 9-5)
+    DentistPortal->>Supabase: Update Availability Table
+    Supabase-->>DentistPortal: Confirm Save
+    
+    rect rgb(255, 240, 200)
+        Note over Supabase,UserWebApp: Real-Time Sync (Broadcast)
+        Supabase->>UserWebApp: Push New Availability Data
+        UserWebApp->>UserWebApp: Fetch New Availability
+    end
+    
+    UserWebApp->>Supabase: Query Updated Slots
+    Supabase-->>UserWebApp: Return Fresh Data
+```
 
 ### Class Diagram
-![Class Diagram](docs/diagrams/class-diagram.png)
+
+```mermaid
+classDiagram
+    class Appointment {
+        +UUID id
+        +UUID dentist_id
+        +UUID patient_id
+        +String dentist_name
+        +String patient_name
+        +Date appointment_date
+        +String appointment_time
+        +String appointment_type
+        +String status
+        +String payment_method
+        +String payment_status
+        +DateTime created_at
+        +DateTime updated_at
+    }
+
+    class Dentist {
+        +UUID id
+        +String name
+        +String email
+        +String specialization
+        +String bio
+        +Integer years_of_experience
+        +String education
+        +Decimal rating
+        +String image_url
+        +DateTime created_at
+    }
+
+    class DentistAvailability {
+        +UUID id
+        +UUID dentist_id
+        +Integer day_of_week
+        +Time start_time
+        +Time end_time
+        +Boolean is_available
+        +DateTime created_at
+    }
+
+    class Profile {
+        +UUID id
+        +String full_name
+        +String email
+        +String phone
+        +DateTime created_at
+        +DateTime updated_at
+    }
+
+    Dentist "1" --> "*" Appointment : has
+    Dentist "1" --> "*" DentistAvailability : has
+    Profile "1" --> "*" Appointment : books
+```
 
 ---
 
-## �🚀 Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js v18.0.0 or higher
@@ -125,29 +220,9 @@ aqua-dent-link-main/
 │   └── package.json
 │
 ├── admin-app/                    # Admin Panel (React + Vite)
-│   ├── src/
-│   │   ├── pages/                # Admin pages
-│   │   └── components/           # Admin components
-│   └── package.json
-│
 ├── dentist-portal/               # Dentist Dashboard (React + Vite)
-│   ├── src/
-│   │   ├── pages/                # Portal pages
-│   │   └── components/           # Portal components
-│   └── package.json
-│
 ├── dental-conditions-detection/  # AI Detection (FastAPI + Python)
-│   ├── backend/
-│   │   ├── app/
-│   │   │   ├── api/              # FastAPI routes
-│   │   │   └── services/         # AI inference
-│   │   └── pyproject.toml
-│   └── docs/
-│
 ├── supabase/                     # Database & Edge Functions
-│   ├── functions/
-│   └── migrations/
-│
 └── package.json                  # Root config (runs all services)
 ```
 
@@ -160,7 +235,6 @@ aqua-dent-link-main/
 - Vite 5 for fast builds
 - TailwindCSS for styling
 - shadcn/ui components
-- React Query for data fetching
 
 ### Backend
 - Node.js + Express
@@ -171,7 +245,6 @@ aqua-dent-link-main/
 - FastAPI - High-performance Python API
 - Roboflow - Computer vision detection
 - OpenAI/Gemini - Diagnostic reports
-- LangChain - AI orchestration
 
 ---
 
@@ -193,25 +266,6 @@ aqua-dent-link-main/
 | `POST` | `/api/v1/detect` | Detect conditions in image |
 | `POST` | `/api/v1/detect-dicom` | Process DICOM files |
 | `POST` | `/api/v1/generate-diagnostic-report` | Generate AI report |
-
----
-
-## 🔐 Getting API Keys
-
-### Supabase (Required)
-1. Create project at [supabase.com](https://supabase.com)
-2. Go to Project Settings → API
-3. Copy URL and anon/service_role keys
-
-### Roboflow (Required for AI)
-1. Create account at [roboflow.com](https://roboflow.com)
-2. Go to Settings → API Keys
-3. Copy your API key
-
-### Stripe (Optional - Payments)
-1. Create account at [stripe.com](https://stripe.com)
-2. Go to Developers → API Keys
-3. Copy publishable and secret keys
 
 ---
 
