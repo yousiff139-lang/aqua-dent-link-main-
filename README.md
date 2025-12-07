@@ -1,447 +1,188 @@
-# 🦷 DentalCare Connect - Complete Dental Practice Management Platform
+# 🦷 DentalCare Connect
 
-<p align="center">
-  <img src="https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=white" alt="React">
-  <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Vite-5.4-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite">
-  <img src="https://img.shields.io/badge/Supabase-2.75-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase">
-  <img src="https://img.shields.io/badge/TailwindCSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="TailwindCSS">
-  <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/FastAPI-Latest-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
-</p>
-
-A comprehensive dental practice management platform featuring **patient booking**, **dentist portal**, **admin dashboard**, and **AI-powered X-ray analysis** for dental condition detection.
-
----
-
-## 📋 Table of Contents
-
-- [Overview](#-overview)
-- [System Architecture](#-system-architecture)
-- [Features](#-features)
-- [Prerequisites](#-prerequisites)
-- [Quick Start](#-quick-start)
-- [Detailed Setup](#-detailed-setup)
-- [Running the Application](#-running-the-application)
-- [Project Structure](#-project-structure)
-- [Environment Variables](#-environment-variables)
-- [API Documentation](#-api-documentation)
-- [Troubleshooting](#-troubleshooting)
-- [Contributing](#-contributing)
-- [License](#-license)
-
----
-
-## 🌟 Overview
-
-DentalCare Connect is a multi-portal dental practice management system consisting of:
-
-| Portal | Description | Default Port |
-|--------|-------------|--------------|
-| **User Website** | Patient-facing booking and appointment management | `8081` |
-| **Dentist Portal** | Dentist dashboard for managing patients and appointments | `5173` |
-| **Admin Panel** | Administrative dashboard for managing dentists and system | `3010` |
-| **Backend API** | Node.js/Express API server | `3000` |
-| **AI Detection** | Python/FastAPI server for X-ray analysis | `8000` |
-
----
-
-## 🏗 System Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Frontend Applications                         │
-├──────────────────┬──────────────────┬──────────────────────────────┤
-│   User Website   │  Dentist Portal  │        Admin Panel           │
-│   (React+Vite)   │   (React+Vite)   │       (React+Vite)           │
-│   Port: 8081     │   Port: 5173     │       Port: 3010             │
-└────────┬─────────┴────────┬─────────┴─────────────┬────────────────┘
-         │                  │                       │
-         ▼                  ▼                       ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Backend Services                             │
-├──────────────────────────────┬──────────────────────────────────────┤
-│      Node.js Backend API     │      Python AI Detection API         │
-│      (Express + Supabase)    │      (FastAPI + Roboflow)            │
-│      Port: 3000              │      Port: 8000                      │
-└──────────────┬───────────────┴──────────────────┬───────────────────┘
-               │                                  │
-               ▼                                  ▼
-┌──────────────────────────────┐    ┌─────────────────────────────────┐
-│        Supabase              │    │      External AI Services       │
-│   (Database + Auth + Storage)│    │   (Roboflow, OpenAI, Gemini)    │
-└──────────────────────────────┘    └─────────────────────────────────┘
-```
-
----
+AI-powered dental practice management platform with patient booking, dentist portal, admin dashboard, and X-ray analysis
 
 ## ✨ Features
 
-### 🧑‍⚕️ Patient Features
-- **Easy Booking** - Book appointments with available dentists
-- **Dentist Profiles** - View dentist credentials, specializations, and reviews
-- **Appointment Management** - View, reschedule, or cancel appointments
-- **Medical History** - Upload X-rays and medical documents
-- **AI Chatbot** - Get answers to dental questions
-
-### 👨‍⚕️ Dentist Features
-- **Dashboard** - Overview of appointments and patients
-- **Patient Management** - View patient history and documents
-- **Availability Settings** - Set weekly availability schedule
-- **X-Ray Analysis** - AI-powered detection of cavities and periapical lesions
-- **Diagnostic Reports** - Generate professional AI-powered reports
-
-### 🛠 Admin Features
-- **Dentist Management** - Add, edit, or remove dentist profiles
-- **Appointment Overview** - View all system appointments
-- **User Management** - Manage patients and users
-- **System Statistics** - Dashboard with key metrics
-
-### 🤖 AI Features
-- **Dental X-Ray Analysis** - Detect cavities and periapical lesions
-- **DICOM Support** - Full DICOM file processing with metadata extraction
-- **Confidence Scores** - Detection confidence visualization
-- **Diagnostic Reports** - AI-generated professional reports with recommendations
-
----
-
-## 📋 Prerequisites
-
-Before you begin, ensure you have the following installed:
-
-| Requirement | Version | Check Command |
-|------------|---------|---------------|
-| **Node.js** | v18.0.0+ | `node --version` |
-| **npm** | v9.0.0+ | `npm --version` |
-| **Python** | 3.12+ | `python --version` |
-| **UV** | Latest | `uv --version` |
-
-### Required API Keys
-
-| Service | Purpose | Required |
-|---------|---------|----------|
-| **Supabase** | Database, Auth, Storage | ✅ Yes |
-| **Roboflow** | AI X-ray detection | ✅ Yes (for AI features) |
-| **Stripe** | Payment processing | ⚠️ Optional |
-| **OpenAI/Gemini** | Chatbot & Reports | ⚠️ Optional |
-
----
+- 🗓️ **Smart Booking** - Patients book appointments with real-time dentist availability
+- 👨‍⚕️ **Dentist Portal** - Dashboard for managing patients, appointments, and X-ray analysis
+- 🛡️ **Admin Panel** - Manage dentists, view statistics, and system administration
+- 🔍 **AI X-Ray Analysis** - Detects cavities and periapical lesions using Roboflow AI
+- 📝 **Diagnostic Reports** - AI-generated reports with treatment recommendations
+- 💬 **Smart Chatbot** - Answers dental questions using Google Gemini
+- 📄 **PDF Export** - Download appointment summaries and diagnostic reports
+- 🎨 **Modern UI** - Beautiful glassmorphism design with smooth animations
 
 ## 🚀 Quick Start
 
-```bash
-# 1. Clone the repository
-git clone <YOUR_GIT_URL>
-cd aqua-dent-link-main
+### Prerequisites
+- Node.js v18.0.0 or higher
+- Python 3.12 or higher
+- pnpm (recommended) or npm
 
-# 2. Install all dependencies
+### Installation
+
+1. **Clone the repository**
+```bash
+git clone https://github.com/yousiff139-lang/aqua-dent-link-main.git
+cd aqua-dent-link-main
+```
+
+2. **Install dependencies**
+```bash
 npm install
 cd backend && npm install && cd ..
 cd admin-app && npm install && cd ..
 cd dentist-portal && npm install && cd ..
 cd dental-conditions-detection/backend && uv sync && cd ../..
-
-# 3. Set up environment variables
-cp .env.example .env
-cp backend/.env.example backend/.env
-cp admin-app/.env.example admin-app/.env
-cp dentist-portal/.env.example dentist-portal/.env
-
-# 4. Configure your API keys in the .env files (see Environment Variables section)
-
-# 5. Start all services
-npm run dev
 ```
 
----
+3. **Configure environment variables**
 
-## 📦 Detailed Setup
-
-### Step 1: Clone and Install
-
-```bash
-# Clone the repository
-git clone <YOUR_GIT_URL>
-cd aqua-dent-link-main
-
-# Install root dependencies
-npm install
+Create `.env` in root:
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+VITE_API_URL=http://localhost:3000
 ```
 
-### Step 2: Install Sub-Project Dependencies
-
-```bash
-# Backend API
-cd backend && npm install && cd ..
-
-# Admin Panel
-cd admin-app && npm install && cd ..
-
-# Dentist Portal
-cd dentist-portal && npm install && cd ..
-
-# AI Detection (Python)
-cd dental-conditions-detection/backend
-uv sync  # or: pip install -e .
-cd ../..
+Create `backend/.env`:
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+PORT=3000
 ```
 
-### Step 3: Configure Environment Variables
+Create `dental-conditions-detection/backend/.env`:
+```env
+ROBOFLOW_API_KEY=your_roboflow_api_key
+OPENAI_API_KEY=your_openai_api_key
+DEBUG=true
+```
 
-Create `.env` files in each directory. See [Environment Variables](#-environment-variables) for details.
+### Running the Application
 
-### Step 4: Set Up Supabase
-
-1. Create a project at [supabase.com](https://supabase.com)
-2. Run the database migrations from `supabase/migrations/`
-3. Configure RLS policies as needed
-4. Copy your API keys to the `.env` files
-
----
-
-## 🏃 Running the Application
-
-### Run All Services (Recommended)
-
+Single command to start everything:
 ```bash
 npm run dev
 ```
 
-This starts all services concurrently:
-- User Website: http://localhost:8081
-- Admin Panel: http://localhost:3010
-- Dentist Portal: http://localhost:5173
-- Backend API: http://localhost:3000
-- AI Detection: http://localhost:8000
+This starts:
+- 🌐 **User Website**: http://localhost:8081
+- 👨‍⚕️ **Dentist Portal**: http://localhost:5173
+- 🛡️ **Admin Panel**: http://localhost:3010
+- ⚙️ **Backend API**: http://localhost:3000
+- 🤖 **AI Detection**: http://localhost:8000
 
-### Run Individual Services
-
-```bash
-# User Website only
-npm run dev:main
-
-# Admin Panel only
-npm run dev:admin
-
-# Dentist Portal only
-npm run dev:dentist
-
-# Backend API only
-npm run dev:backend
-
-# AI Detection (Python)
-npm run dev:dental-ai
-# Or manually:
-cd dental-conditions-detection/backend
-.venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
----
-
-## 📁 Project Structure
+## 🏗️ Project Structure
 
 ```
 aqua-dent-link-main/
 ├── src/                          # User Website (React + Vite)
-│   ├── components/               # Reusable UI components
+│   ├── components/               # UI components
 │   ├── pages/                    # Page components
-│   ├── hooks/                    # Custom React hooks
-│   ├── contexts/                 # React contexts (Auth, etc.)
-│   ├── services/                 # API service layer
-│   └── integrations/supabase/    # Supabase client & types
+│   └── hooks/                    # Custom hooks
 │
 ├── backend/                      # Node.js Backend API
 │   ├── src/
-│   │   ├── controllers/          # Route controllers
+│   │   ├── controllers/          # Route handlers
 │   │   ├── routes/               # API routes
-│   │   ├── services/             # Business logic
-│   │   └── middlewares/          # Express middlewares
+│   │   └── services/             # Business logic
 │   └── package.json
 │
 ├── admin-app/                    # Admin Panel (React + Vite)
 │   ├── src/
-│   │   ├── components/           # Admin UI components
 │   │   ├── pages/                # Admin pages
-│   │   └── contexts/             # Auth context
+│   │   └── components/           # Admin components
 │   └── package.json
 │
 ├── dentist-portal/               # Dentist Dashboard (React + Vite)
 │   ├── src/
-│   │   ├── components/           # Portal components
-│   │   │   ├── XRayViewer.tsx    # X-ray analysis viewer
-│   │   │   └── XRayAnalysisSection.tsx
 │   │   ├── pages/                # Portal pages
-│   │   └── hooks/                # Custom hooks
+│   │   └── components/           # Portal components
 │   └── package.json
 │
-├── dental-conditions-detection/  # AI Detection System
+├── dental-conditions-detection/  # AI Detection (FastAPI + Python)
 │   ├── backend/
 │   │   ├── app/
 │   │   │   ├── api/              # FastAPI routes
-│   │   │   ├── services/         # AI inference services
-│   │   │   └── models/           # Pydantic models
+│   │   │   └── services/         # AI inference
 │   │   └── pyproject.toml
-│   └── docs/                     # AI system documentation
+│   └── docs/
 │
-├── supabase/                     # Supabase configuration
-│   ├── functions/                # Edge functions
-│   └── migrations/               # Database migrations
+├── supabase/                     # Database & Edge Functions
+│   ├── functions/
+│   └── migrations/
 │
-├── docs/                         # Documentation
-│   ├── PATIENT_BOOKING_GUIDE.md
-│   ├── DENTIST_BOOKING_MANAGEMENT_GUIDE.md
-│   ├── TROUBLESHOOTING_GUIDE.md
-│   └── FAQ.md
-│
-├── package.json                  # Root package.json
-├── vite.config.ts                # Vite configuration
-└── README.md                     # This file
+└── package.json                  # Root config (runs all services)
 ```
 
----
+## 🛠️ Tech Stack
 
-## 🔐 Environment Variables
+### Frontend
+- React 18 with TypeScript
+- Vite 5 for fast builds
+- TailwindCSS for styling
+- shadcn/ui components
+- React Query for data fetching
 
-### User Website (`.env`)
+### Backend
+- Node.js + Express
+- Supabase (Database + Auth + Storage)
+- Stripe for payments
 
-```env
-# Supabase (Required)
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+### AI Detection
+- FastAPI - High-performance Python API
+- Roboflow - Computer vision detection
+- OpenAI/Gemini - Diagnostic reports
+- LangChain - AI orchestration
 
-# Backend API
-VITE_API_URL=http://localhost:3000
+## 📝 API Endpoints
 
-# Stripe (Optional - for payments)
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_key
-```
+### Backend API (Port 3000)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/health` | Health check |
+| `POST` | `/api/patients/register` | Patient registration |
+| `POST` | `/api/patients/login` | Patient login |
+| `GET` | `/api/dentists` | List dentists |
+| `POST` | `/api/appointments` | Create appointment |
 
-### Backend (`backend/.env`)
+### AI Detection API (Port 8000)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/health` | Health check |
+| `POST` | `/api/v1/detect` | Detect conditions in image |
+| `POST` | `/api/v1/detect-dicom` | Process DICOM files |
+| `POST` | `/api/v1/generate-diagnostic-report` | Generate AI report |
 
-```env
-# Server
-PORT=3000
-NODE_ENV=development
+## 🔐 Getting API Keys
 
-# Supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+### Supabase (Required)
+1. Create project at [supabase.com](https://supabase.com)
+2. Go to Project Settings → API
+3. Copy URL and anon/service_role keys
 
-# CORS
-CORS_ORIGIN=http://localhost:8081,http://localhost:5173,http://localhost:3010
+### Roboflow (Required for AI)
+1. Create account at [roboflow.com](https://roboflow.com)
+2. Go to Settings → API Keys
+3. Copy your API key
 
-# Stripe (Optional)
-STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
-STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
-```
+### Stripe (Optional - Payments)
+1. Create account at [stripe.com](https://stripe.com)
+2. Go to Developers → API Keys
+3. Copy publishable and secret keys
 
-### AI Detection (`dental-conditions-detection/backend/.env`)
+## 👥 Authors
 
-```env
-ROBOFLOW_API_KEY=your_roboflow_api_key
-OPENAI_API_KEY=your_openai_api_key
-DEBUG=false
-```
-
-### Dentist Portal (`dentist-portal/.env`)
-
-```env
-VITE_API_URL=http://localhost:3000/api
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-```
-
----
-
-## 📚 API Documentation
-
-### Backend API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Health check |
-| `/api/patients/register` | POST | Patient registration |
-| `/api/patients/login` | POST | Patient login |
-| `/api/dentists` | GET | List all dentists |
-| `/api/appointments` | POST | Create appointment |
-| `/api/appointments/:id` | PUT | Update appointment |
-
-### AI Detection Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/health` | GET | Health check |
-| `/api/v1/detect` | POST | Detect conditions in image |
-| `/api/v1/detect-dicom` | POST | Process DICOM files |
-| `/api/v1/generate-diagnostic-report` | POST | Generate AI report |
-
-Full API documentation available at:
-- Backend: http://localhost:3000/docs (when running)
-- AI Detection: http://localhost:8000/docs (Swagger UI)
-
----
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-#### Port Already in Use
-```bash
-# Find and kill process on port (Windows)
-netstat -ano | findstr :8081
-taskkill /PID <PID> /F
-
-# Or change ports in vite.config.ts
-```
-
-#### Supabase Connection Failed
-- Verify your Supabase URL and keys in `.env`
-- Check that your IP is whitelisted in Supabase dashboard
-- Ensure RLS policies are configured correctly
-
-#### AI Detection Not Working
-- Verify Python 3.12+ is installed
-- Check that `uv sync` completed successfully
-- Confirm ROBOFLOW_API_KEY is set correctly
-- Ensure the AI service is running on port 8000
-
-#### Build Errors
-```bash
-# Clear node_modules and reinstall
-rm -rf node_modules package-lock.json
-npm install
-```
-
-For more detailed troubleshooting, see [docs/TROUBLESHOOTING_GUIDE.md](docs/TROUBLESHOOTING_GUIDE.md).
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
+- **Karrar Al-Mayaly**
+- **Mohammed Majed**
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is for educational purposes.
 
 ---
 
-## 📧 Support
-
-For questions or support:
-- 📖 Check the [FAQ](docs/FAQ.md)
-- 🐛 Open an [Issue](https://github.com/yourusername/aqua-dent-link/issues)
-- 📧 Email: support@dentalcareconnect.com
-
----
-
-<p align="center">
-  <b>Built with ❤️ for better dental healthcare</b>
-</p>
+Made with ❤️ for better dental healthcare
