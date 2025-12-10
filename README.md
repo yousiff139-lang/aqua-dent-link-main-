@@ -137,6 +137,170 @@ classDiagram
     Profile "1" --> "*" Appointment : books
 ```
 
+### C4 Model - System Architecture
+
+The C4 model provides a hierarchical view of the system architecture at different levels of abstraction.
+
+#### Level 1: System Context Diagram
+
+Shows how users interact with DentalCare Connect and its external dependencies.
+
+```mermaid
+flowchart TB
+    subgraph users["Users"]
+        patient["🧑 Patient<br/>Books appointments, uses chatbot"]
+        dentist["👨‍⚕️ Dentist<br/>Manages patients, analyzes X-rays"]
+        admin["🛡️ Admin<br/>System administration"]
+    end
+
+    subgraph system["DentalCare Connect Platform"]
+        dentalcare["🦷 DentalCare Connect<br/>AI-powered dental practice<br/>management platform"]
+    end
+
+    subgraph external["External Systems"]
+        supabase[("🗄️ Supabase<br/>Database, Auth, Storage")]
+        roboflow["🤖 Roboflow AI<br/>X-ray detection model"]
+        gemini["💬 Google Gemini<br/>AI chatbot responses"]
+        stripe["💳 Stripe<br/>Payment processing"]
+    end
+
+    patient -->|"Books appointments, chats"| dentalcare
+    dentist -->|"Manages patients, X-rays"| dentalcare
+    admin -->|"Administers system"| dentalcare
+
+    dentalcare -->|"Stores data, auth"| supabase
+    dentalcare -->|"Detects cavities"| roboflow
+    dentalcare -->|"Answers questions"| gemini
+    dentalcare -->|"Processes payments"| stripe
+```
+
+#### Level 2: Container Diagram
+
+Shows all applications and how they communicate.
+
+```mermaid
+flowchart TB
+    subgraph users["Users"]
+        patient["🧑 Patient"]
+        dentist["👨‍⚕️ Dentist"]
+        admin["🛡️ Admin"]
+    end
+
+    subgraph platform["DentalCare Connect Platform"]
+        webapp["🌐 User Website<br/>React + Vite<br/>Port: 8081"]
+        portal["👨‍⚕️ Dentist Portal<br/>React + Vite<br/>Port: 5173"]
+        adminapp["🛡️ Admin Panel<br/>React + Vite<br/>Port: 3010"]
+        backend["⚙️ Backend API<br/>Node.js + Express<br/>Port: 3000"]
+        aiapi["🤖 AI Detection API<br/>FastAPI + Python<br/>Port: 8000"]
+    end
+
+    subgraph external["External Systems"]
+        supabase[("🗄️ Supabase<br/>PostgreSQL, Auth, Realtime")]
+        roboflow["🔬 Roboflow<br/>Computer Vision AI"]
+        gemini["🧠 Gemini<br/>LLM Chatbot"]
+    end
+
+    patient -->|"HTTPS"| webapp
+    dentist -->|"HTTPS"| portal
+    admin -->|"HTTPS"| adminapp
+
+    webapp -->|"REST/JSON"| backend
+    portal -->|"REST/JSON"| backend
+    portal -->|"X-ray Analysis"| aiapi
+    adminapp -->|"REST/JSON"| backend
+
+    backend -->|"PostgreSQL"| supabase
+    backend -->|"Chat API"| gemini
+    aiapi -->|"Image Detection"| roboflow
+```
+
+#### Level 3: Backend API Components
+
+Internal structure of the Node.js Express backend service.
+
+```mermaid
+flowchart TB
+    subgraph backend["Backend API (Node.js + Express)"]
+        subgraph routes["Routes Layer"]
+            r1["appointments.routes.ts"]
+            r2["admin.routes.ts"]
+            r3["chatbot.routes.ts"]
+            r4["dentist.routes.ts"]
+            r5["payments.routes.ts"]
+        end
+
+        subgraph controllers["Controllers Layer"]
+            c1["appointmentsController"]
+            c2["adminController"]
+            c3["chatbotController"]
+            c4["dentistController"]
+        end
+
+        subgraph services["Services Layer"]
+            s1["appointments.service.ts<br/>Booking logic, slots"]
+            s2["admin.service.ts<br/>User management"]
+            s3["chatbot.service.ts<br/>AI Q&A"]
+            s4["gemini.service.ts<br/>LLM integration"]
+            s5["xray-analysis.service.ts<br/>Bridges to AI API"]
+        end
+
+        subgraph repos["Repositories Layer"]
+            repo1["dentists.repository.ts"]
+            repo2["appointments.repository.ts"]
+        end
+
+        middleware["🔒 Middleware<br/>Auth, Validation, Errors"]
+    end
+
+    supabase[("🗄️ Supabase")]
+    gemini["🧠 Gemini API"]
+
+    routes --> controllers
+    controllers --> services
+    services --> repos
+    repos --> supabase
+    s3 --> gemini
+    s4 --> gemini
+    middleware -.->|"Protects"| routes
+```
+
+#### Level 3: AI Detection Service Components
+
+Internal structure of the FastAPI Python service for X-ray analysis.
+
+```mermaid
+flowchart TB
+    subgraph aiservice["AI Detection API (FastAPI + Python)"]
+        subgraph api["API Layer"]
+            e1["/api/v1/detect<br/>Detect conditions"]
+            e2["/api/v1/detect-dicom<br/>Process DICOM files"]
+            e3["/api/v1/generate-diagnostic-report<br/>AI report generation"]
+        end
+
+        subgraph services["Services Layer"]
+            ds["detection_service.py<br/>Cavity/lesion detection"]
+            rs["report_service.py<br/>Diagnostic report generation"]
+            dicom["dicom_service.py<br/>Medical image processing"]
+        end
+
+        subgraph deps["Dependencies"]
+            rf["roboflow_client.py<br/>AI model inference"]
+            img["image_utils.py<br/>Image preprocessing"]
+        end
+
+        models["📦 Pydantic Models<br/>Request/Response schemas"]
+    end
+
+    roboflow["🔬 Roboflow<br/>Dental X-ray Model"]
+    openai["🧠 OpenAI/Gemini<br/>Report Generation"]
+
+    api --> services
+    services --> deps
+    deps --> roboflow
+    rs --> openai
+    models -.->|"Validates"| api
+```
+
 ---
 
 ## 🚀 Quick Start
