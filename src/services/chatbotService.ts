@@ -403,6 +403,18 @@ export class ChatbotService {
         response = await this.handlePaymentMethod(session, message);
         break;
 
+      case ConversationState.AWAITING_CARD_NUMBER:
+        response = await this.handleCardNumber(session, message);
+        break;
+
+      case ConversationState.AWAITING_CARD_EXPIRY:
+        response = await this.handleCardExpiry(session, message);
+        break;
+
+      case ConversationState.AWAITING_CARD_CVV:
+        response = await this.handleCardCVV(session, message);
+        break;
+
       case ConversationState.AWAITING_QUESTION:
         response = await this.handleQuestion(session, message);
         break;
@@ -692,7 +704,46 @@ export class ChatbotService {
   private async handleMedicalHistory(session: ChatSession, message: string): Promise<ChatbotResponse> {
     const response = message.toLowerCase().trim();
 
-    // Option 1: Skip
+    // FIRST: Check if message contains uploaded file URLs - extract them before anything else
+    if (message.includes('[Uploaded Files]:')) {
+      console.log('📎 [DEBUG] Found uploaded files in medical history message');
+      // Extract URLs from the message
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const urls = message.match(urlRegex) || [];
+
+      if (urls.length > 0) {
+        // Store the URLs in context
+        session.context.documentUrls = urls;
+        session.context.wantsDocuments = true;
+        console.log('📎 [DEBUG] Extracted', urls.length, 'document URLs:', urls);
+
+        // Update session
+        activeSessions.set(session.userId, session);
+
+        // Proceed to chronic diseases
+        session.currentState = ConversationState.AWAITING_CHRONIC_DISEASES;
+        activeSessions.set(session.userId, session);
+        return {
+          message: `Documents received! 📄 (${urls.length} file(s) uploaded)\n\n**Important:** Do you have any chronic conditions such as:\n• Diabetes\n• High blood pressure\n• Heart disease\n• Other chronic conditions\n\nPlease list them, or type 'none' if you don't have any:`,
+          state: ConversationState.AWAITING_CHRONIC_DISEASES,
+          requiresInput: true,
+        };
+      }
+    }
+
+    // Option 1: Done uploading - check FIRST to avoid matching 'upload' in 'done uploading'
+    if (response.includes('done')) {
+      // User finished uploading or has no more documents - proceed to chronic diseases
+      session.currentState = ConversationState.AWAITING_CHRONIC_DISEASES;
+      activeSessions.set(session.userId, session);
+      return {
+        message: "**Important:** Do you have any chronic conditions such as:\n• Diabetes\n• High blood pressure\n• Heart disease\n• Other chronic conditions\n\nPlease list them, or type 'none' if you don't have any:",
+        state: ConversationState.AWAITING_CHRONIC_DISEASES,
+        requiresInput: true,
+      };
+    }
+
+    // Option 2: Skip
     if (response.includes('skip') || response.includes('no') || response.includes('none')) {
       // User has no medical history - proceed to chronic diseases
       return {
@@ -702,7 +753,7 @@ export class ChatbotService {
       };
     }
 
-    // Option 2: Upload Documents
+    // Option 3: Upload Documents (only if not already 'done')
     if (response.includes('upload') || response.includes('document')) {
       // Enable file upload and ask user to upload
       return {
@@ -1027,20 +1078,150 @@ export class ChatbotService {
     const lowerMessage = message.toLowerCase().trim();
     let paymentMethod: 'cash' | 'card' = 'cash';
 
-    if (lowerMessage.includes('card') || lowerMessage.includes('credit') || lowerMessage.includes('debit')) {
+    if (lowerMessage.includes('card') || lowerMessage.includes('credit') || lowerMessage.includes('debit') || lowerMessage.includes('visa') || lowerMessage.includes('mastercard')) {
       paymentMethod = 'card';
     }
 
     session.context.paymentMethod = paymentMethod;
-    const dentist = session.context.suggestedDentist;
 
-    // Show confirmation summary
-    const confirmationMessage = `Here's what I've gathered:\n\n• Dentist: ${dentist?.name || 'N/A'}\n• Date & Time: ${session.context.selectedTime} on ${session.context.selectedDate}\n• Payment: ${paymentMethod.toUpperCase()}\n• Symptoms: ${session.context.symptom || 'Not specified'}\n\nIs this correct or would you like to edit?`;
+    // If card payment, start card collection flow
+    if (paymentMethod === 'card') {
+      session.context.cardInfo = {};
+      return {
+        message: `💳 **Card Payment Selected**\n\nPlease enter your card number:\n\n_Example: 4111 1111 1111 1111_\n\n> For testing, use: \`4111111111111111\` (Visa test card)`,
+        state: ConversationState.AWAITING_CARD_NUMBER,
+        requiresInput: true,
+      };
+    }
+
+    // Cash payment - go directly to confirmation
+    const dentist = session.context.suggestedDentist;
+    const confirmationMessage = `Here's what I've gathered:\n\n• Dentist: ${dentist?.name || 'N/A'}\n• Date & Time: ${session.context.selectedTime} on ${session.context.selectedDate}\n• Payment: CASH (pay at appointment)\n• Symptoms: ${session.context.symptom || 'Not specified'}\n\nIs this correct or would you like to edit?`;
 
     return {
       message: confirmationMessage,
       state: ConversationState.AWAITING_FINAL_CONFIRMATION,
       options: ['Yes, this is correct', 'Edit details'],
+      requiresInput: true,
+    };
+  }
+
+  private async handleCardNumber(session: ChatSession, message: string): Promise<ChatbotResponse> {
+    const cardNumber = message.replace(/\D/g, '');
+
+    if (cardNumber.length < 13 || cardNumber.length > 19) {
+      return {
+        message: `❌ Invalid card number length. Please enter a valid card number (13-19 digits):`,
+        state: ConversationState.AWAITING_CARD_NUMBER,
+        requiresInput: true,
+      };
+    }
+
+    let cardType: 'visa' | 'mastercard' | 'amex' | 'discover' | 'unknown' = 'unknown';
+    if (/^4/.test(cardNumber)) cardType = 'visa';
+    else if (/^5[1-5]/.test(cardNumber) || /^2[2-7]/.test(cardNumber)) cardType = 'mastercard';
+    else if (/^3[47]/.test(cardNumber)) cardType = 'amex';
+    else if (/^6/.test(cardNumber)) cardType = 'discover';
+
+    session.context.cardInfo = {
+      ...session.context.cardInfo,
+      cardNumber,
+      cardType,
+      lastFour: cardNumber.slice(-4),
+    };
+
+    const cardTypeEmoji = cardType === 'visa' ? '💙' : cardType === 'mastercard' ? '🟠' : cardType === 'amex' ? '💎' : '💳';
+
+    return {
+      message: `${cardTypeEmoji} **${cardType.toUpperCase()} Detected!**\n\nCard ending in ****${cardNumber.slice(-4)}\n\nNow, please enter the expiry date (MM/YY):`,
+      state: ConversationState.AWAITING_CARD_EXPIRY,
+      requiresInput: true,
+    };
+  }
+
+  private async handleCardExpiry(session: ChatSession, message: string): Promise<ChatbotResponse> {
+    const cleaned = message.replace(/[^\d]/g, '');
+    let month: string, year: string;
+
+    if (cleaned.length === 4) {
+      month = cleaned.slice(0, 2);
+      year = cleaned.slice(2, 4);
+    } else if (message.includes('/') || message.includes('-')) {
+      const parts = message.split(/[\/\-]/);
+      month = parts[0]?.trim().padStart(2, '0') || '';
+      year = parts[1]?.trim() || '';
+    } else {
+      return {
+        message: `❌ Invalid format. Please enter expiry date as MM/YY:`,
+        state: ConversationState.AWAITING_CARD_EXPIRY,
+        requiresInput: true,
+      };
+    }
+
+    const monthNum = parseInt(month);
+    if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+      return {
+        message: `❌ Invalid month. Please enter a valid expiry date (MM/YY):`,
+        state: ConversationState.AWAITING_CARD_EXPIRY,
+        requiresInput: true,
+      };
+    }
+
+    const currentYear = new Date().getFullYear() % 100;
+    const currentMonth = new Date().getMonth() + 1;
+    const yearNum = parseInt(year);
+
+    if (yearNum < currentYear || (yearNum === currentYear && monthNum < currentMonth)) {
+      return {
+        message: `❌ This card has expired. Please use a valid card.`,
+        state: ConversationState.AWAITING_CARD_EXPIRY,
+        options: ['Try Again', 'Use Cash'],
+        requiresInput: true,
+      };
+    }
+
+    session.context.cardInfo = {
+      ...session.context.cardInfo,
+      expiryDate: `${month}/${year}`,
+    };
+
+    const cvvLength = session.context.cardInfo?.cardType === 'amex' ? '4' : '3';
+
+    return {
+      message: `✓ Expiry: ${month}/${year}\n\nNow, please enter your CVV (${cvvLength} digits):`,
+      state: ConversationState.AWAITING_CARD_CVV,
+      requiresInput: true,
+    };
+  }
+
+  private async handleCardCVV(session: ChatSession, message: string): Promise<ChatbotResponse> {
+    const cvv = message.replace(/\D/g, '');
+    const expectedLength = session.context.cardInfo?.cardType === 'amex' ? 4 : 3;
+
+    if (cvv.length !== expectedLength) {
+      return {
+        message: `❌ CVV must be ${expectedLength} digits. Please try again:`,
+        state: ConversationState.AWAITING_CARD_CVV,
+        requiresInput: true,
+      };
+    }
+
+    session.context.cardInfo = {
+      ...session.context.cardInfo,
+      cvv,
+      isValid: true,
+    };
+
+    const dentist = session.context.suggestedDentist;
+    const lastFour = session.context.cardInfo?.lastFour || '****';
+    const cardType = session.context.cardInfo?.cardType?.toUpperCase() || 'CARD';
+
+    const confirmationMessage = `✅ **Card Verified!**\n\nHere's your booking summary:\n\n• **Dentist:** ${dentist?.name || 'N/A'}\n• **Date & Time:** ${session.context.selectedTime} on ${session.context.selectedDate}\n• **Payment:** ${cardType} ending in ${lastFour}\n• **Amount:** $50.00\n• **Symptoms:** ${session.context.symptom || 'Not specified'}\n\n💳 Your card will be charged upon confirmation.\n\nIs this correct?`;
+
+    return {
+      message: confirmationMessage,
+      state: ConversationState.AWAITING_FINAL_CONFIRMATION,
+      options: ['Yes, confirm and pay', 'Edit details'],
       requiresInput: true,
     };
   }
@@ -1147,16 +1328,30 @@ export class ChatbotService {
 
       // For other specializations, normalize the specialization name for matching
       // Map enum values to common database values
+      // CRITICAL: These keys MUST match the DentalSpecialization enum values exactly!
       const specializationMap: Record<string, string[]> = {
+        // Old-style enum values (for backward compatibility if any remain)
         'Orthodontist': ['orthodontist', 'orthodontics', 'orthodontic'],
         'Periodontist': ['periodontist', 'periodontics', 'periodontal'],
         'Endodontist': ['endodontist', 'endodontics', 'endodontic'],
         'Oral Surgeon': ['oral surgeon', 'oral surgery', 'maxillofacial', 'oral and maxillofacial'],
         'Pediatric Dentist': ['pediatric', 'pediatric dentist', 'pediatric dentistry', 'pedodontist'],
         'Prosthodontist': ['prosthodontist', 'prosthodontics', 'prosthetic'],
+        // NEW enum values - these match DentalSpecialization enum
+        'Orthodontics': ['orthodontics', 'orthodontist', 'orthodontic', 'braces'],
+        'Periodontics': ['periodontics', 'periodontist', 'periodontal', 'gum specialist'],
+        'Endodontics': ['endodontics', 'endodontist', 'endodontic', 'root canal'],
+        'Oral Surgery': ['oral surgery', 'oral surgeon', 'maxillofacial', 'oral and maxillofacial'],
+        'Pediatric Dentistry': ['pediatric dentistry', 'pediatric', 'pediatric dentist', 'pedodontist', 'children'],
+        'Prosthodontics': ['prosthodontics', 'prosthodontist', 'prosthetic', 'dentures', 'prosthetics'],
+        'Cosmetic Dentistry': ['cosmetic dentistry', 'cosmetic', 'aesthetic', 'esthetic', 'whitening', 'veneers'],
+        'Implant Dentistry': ['implant dentistry', 'implant', 'implants', 'dental implant', 'implantologist'],
+        'Restorative Dentistry': ['restorative dentistry', 'restorative', 'restoration', 'crowns', 'bridges', 'fillings'],
       };
 
       const searchTerms = specializationMap[specialization] || [specialization.toLowerCase()];
+      console.log('🔍 [DEBUG] suggestDentist() called with specialization:', specialization);
+      console.log('🔍 [DEBUG] Search terms resolved to:', searchTerms);
 
       // Build OR condition for matching specialization or specialty
       const orConditions = searchTerms.flatMap(term => [
@@ -1171,6 +1366,12 @@ export class ChatbotService {
         .limit(1);
 
       let dentist = dentists?.[0];
+      console.log('🔍 [DEBUG] Query results - Found dentists:', dentists?.length || 0);
+      if (dentist) {
+        console.log('✅ [DEBUG] Found specialist:', dentist.name, '- Specialty:', dentist.specialization || dentist.specialty);
+      } else {
+        console.log('⚠️ [DEBUG] No specialist found, will fallback to general/any dentist');
+      }
 
       // If no match, try general dentist
       if (!dentist || error) {
@@ -1488,7 +1689,10 @@ export class ChatbotService {
       }
 
       // Save document URLs to medical_documents table if any
+      console.log('📄 [DEBUG] Checking for documentUrls in context:', context.documentUrls?.length || 0, 'documents');
       if (context.documentUrls && context.documentUrls.length > 0) {
+        console.log('📄 [DEBUG] Saving', context.documentUrls.length, 'documents to database');
+        console.log('📄 [DEBUG] Document URLs:', context.documentUrls);
         const documentInserts = context.documentUrls.map(url => {
           const fileName = url.split('/').pop() || 'uploaded_document';
           const lowerFileName = fileName.toLowerCase();
@@ -1521,6 +1725,30 @@ export class ChatbotService {
         if (docsError) {
           console.error('Error saving medical documents:', docsError);
           // Don't fail the appointment if documents fail
+        }
+
+        // ALSO update the appointments table with documents array (like manual booking does)
+        // This ensures documents are visible in dentist portal
+        const documentsForAppointment = context.documentUrls.map(url => {
+          const fileName = url.split('/').pop() || 'uploaded_document';
+          return {
+            name: fileName,
+            url: url,
+            type: fileName.endsWith('.pdf') ? 'application/pdf' : 'image/png',
+          };
+        });
+
+        // @ts-ignore - documents column exists in appointments table
+        const { error: updateDocsError } = await (supabase as any)
+          .from('appointments')
+          .update({ documents: documentsForAppointment })
+          .eq('id', appointment.id);
+
+        if (updateDocsError) {
+          console.error('Error updating appointment with documents:', updateDocsError);
+          // Don't fail - documents are still in medical_documents table
+        } else {
+          console.log('Documents successfully linked to appointment:', documentsForAppointment.length);
         }
       }
     } catch (healthSaveError) {
@@ -1795,13 +2023,17 @@ export class ChatbotService {
 
   private detectSpecialization(symptom: string): DentalSpecialization {
     const lowerSymptom = symptom.toLowerCase();
+    console.log('🔍 [DEBUG] Detecting specialization for symptom:', symptom);
+    console.log('🔍 [DEBUG] Lowercase symptom:', lowerSymptom);
 
     for (const [keyword, specialization] of Object.entries(SYMPTOM_SPECIALIZATION_MAP)) {
       if (lowerSymptom.includes(keyword)) {
+        console.log('✅ [DEBUG] MATCHED keyword:', keyword, '→ Specialization:', specialization);
         return specialization;
       }
     }
 
+    console.log('⚠️ [DEBUG] No keyword matched, defaulting to GENERAL');
     return DentalSpecialization.GENERAL;
   }
 

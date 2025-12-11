@@ -447,15 +447,26 @@ export default function XRayLab() {
                                                     const scaleY = displayHeight / originalHeight;
                                                     const boxColor = getDetectionColor(detection.class_id);
 
+                                                    // IMPORTANT: Roboflow returns x,y as CENTER of bounding box
+                                                    // We need to convert to top-left corner for CSS positioning
+                                                    const boxWidth = detection.width * scaleX;
+                                                    const boxHeight = detection.height * scaleY;
+                                                    const centerX = detection.x * scaleX;
+                                                    const centerY = detection.y * scaleY;
+
+                                                    // Convert center to top-left corner
+                                                    const left = centerX - (boxWidth / 2);
+                                                    const top = centerY - (boxHeight / 2);
+
                                                     return (
                                                         <div
                                                             key={detection.detection_id}
                                                             className="absolute border-2"
                                                             style={{
-                                                                left: detection.x * scaleX,
-                                                                top: detection.y * scaleY,
-                                                                width: detection.width * scaleX,
-                                                                height: detection.height * scaleY,
+                                                                left: left,
+                                                                top: top,
+                                                                width: boxWidth,
+                                                                height: boxHeight,
                                                                 borderColor: boxColor,
                                                             }}
                                                         >

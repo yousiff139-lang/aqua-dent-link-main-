@@ -13,7 +13,7 @@ const createCheckoutSessionSchema = z.object({
   currency: z.string().length(3, 'Currency must be a 3-letter code').default('usd'),
   dentistName: z.string().min(1, 'Dentist name is required'),
   patientEmail: z.string().email('Invalid patient email'),
-  patientName: z.string().min(1, 'Patient name is required'),
+  patientName: z.string().optional(), // Made optional - not always sent by frontend
   appointmentDate: z.string().min(1, 'Appointment date is required'),
   appointmentTime: z.string().min(1, 'Appointment time is required'),
 });
@@ -41,7 +41,7 @@ export class PaymentsController {
         currency: validatedData.currency,
         dentistName: validatedData.dentistName,
         patientEmail: validatedData.patientEmail,
-        patientName: validatedData.patientName,
+        patientName: validatedData.patientName || validatedData.patientEmail.split('@')[0], // Use email prefix as fallback
         appointmentDate: validatedData.appointmentDate,
         appointmentTime: validatedData.appointmentTime,
       });
@@ -94,7 +94,7 @@ export class PaymentsController {
 
       // Get raw body (should be set by middleware)
       const rawBody = (req as any).rawBody;
-      
+
       if (!rawBody) {
         logger.error('Raw body not available for webhook verification');
         throw AppError.internal('Webhook payload not available');

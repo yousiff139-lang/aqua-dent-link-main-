@@ -136,26 +136,57 @@ const Dashboard = () => {
       const result = await bookingService.cancelAppointment(appointmentToCancel.id, reason);
 
       if (result.success) {
+        // Show success message
         toast({
-          title: "Appointment Cancelled",
-          description: result.message,
+          title: "✅ Appointment Cancelled",
+          description: result.message || "Your appointment has been cancelled successfully.",
         });
-        // Refresh appointments
+        // Refresh appointments to update the list
         await fetchAppointments();
       } else {
+        // Policy violation (e.g., too close to appointment time)
         toast({
           title: "Cannot Cancel",
           description: result.message,
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error cancelling appointment:', error);
-      toast({
-        title: "Error",
-        description: "Failed to cancel appointment. Please try again.",
-        variant: "destructive",
-      });
+
+      // Check if the cancellation might have succeeded despite the error
+      // This can happen if the DB update succeeded but notification failed
+      try {
+        // Re-fetch to check if it was actually cancelled
+        const { data: checkAppointment } = await supabase
+          .from('appointments')
+          .select('status')
+          .eq('id', appointmentToCancel.id)
+          .single();
+
+        if (checkAppointment?.status === 'cancelled') {
+          // The cancellation DID succeed, show success message
+          toast({
+            title: "✅ Appointment Cancelled",
+            description: "Your appointment has been cancelled successfully.",
+          });
+          await fetchAppointments();
+        } else {
+          // Cancellation actually failed
+          toast({
+            title: "Error",
+            description: error?.userMessage || "Failed to cancel appointment. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } catch (checkError) {
+        // If we can't check, show error
+        toast({
+          title: "Error",
+          description: "Failed to cancel appointment. Please refresh and try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsCancelling(false);
       setCancelDialogOpen(false);

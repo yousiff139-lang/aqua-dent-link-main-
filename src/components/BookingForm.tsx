@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, CreditCard, Banknote, AlertCircle } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, CreditCard, Banknote, AlertCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -40,6 +40,7 @@ import { generateBookingReference } from "@/utils/bookingReference";
 import { logger, DatabaseOperation, withDatabaseLogging } from "@/utils/logger";
 import { useDentistAvailability, useBookedSlots, generateTimeSlotsForDate } from "@/hooks/useDentistAvailability";
 import { trackBookingAttempt } from "@/utils/performanceMonitor";
+import { CardPaymentForm, CardPaymentData } from "@/components/CardPaymentForm";
 
 // Validation schema using Zod
 const bookingFormSchema = z.object({
@@ -87,7 +88,7 @@ const bookingFormSchema = z.object({
   }).min(1, {
     message: "Please select an appointment time.",
   }),
-  paymentMethod: z.enum(["stripe", "cash"], {
+  paymentMethod: z.enum(["card", "cash"], {
     required_error: "Please select how you would like to pay.",
     invalid_type_error: "Please select a valid payment method.",
   }),
@@ -120,7 +121,7 @@ interface BookingFormProps {
     appointmentId: string;
     date: string;
     time: string;
-    paymentMethod: "stripe" | "cash";
+    paymentMethod: "card" | "cash";
     paymentStatus: "pending" | "paid";
   }) => void;
 }
@@ -135,10 +136,19 @@ export function BookingForm({
   const [error, setError] = useState<string | null>(null);
   const [appointmentTypes, setAppointmentTypes] = useState<any[]>([]);
   const [selectedTypePrice, setSelectedTypePrice] = useState<number>(50);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [cardData, setCardData] = useState<CardPaymentData | null>(null);
+  const [isCardValid, setIsCardValid] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { initiateCheckout, isProcessing: isStripeProcessing, error: stripeError } = useStripeCheckout();
+
+  // Handle card data changes from CardPaymentForm
+  const handleCardDataChange = (data: CardPaymentData, isValid: boolean) => {
+    setCardData(data);
+    setIsCardValid(isValid);
+  };
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
@@ -161,7 +171,7 @@ export function BookingForm({
       const { data, error } = await (supabase as any).rpc('get_services_for_dentist', {
         p_dentist_id: dentistId
       });
-      
+
       if (error) {
         console.error('Error fetching services:', error);
         // Fallback: fetch all services
@@ -180,7 +190,7 @@ export function BookingForm({
 
   // Watch the selected date to fetch booked slots
   const selectedDate = form.watch("date");
-  
+
   // Watch appointment type to update price
   const selectedType = form.watch("appointmentType");
   useEffect(() => {
@@ -201,14 +211,14 @@ export function BookingForm({
   // This ensures we only show times when dentist is actually available
   const displayTimeSlots = availableTimeSlots.length > 0
     ? availableTimeSlots.map(slot => ({
-        value: slot.time,
-        label: new Date(`2000-01-01T${slot.time}`).toLocaleTimeString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        }),
-        disabled: slot.isBooked,
-      }))
+      value: slot.time,
+      label: new Date(`2000-01-01T${slot.time}`).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }),
+      disabled: slot.isBooked,
+    }))
     : []; // Empty array if no availability - don't show fallback slots
 
   // Helper function to check if a date is available based on dentist schedule
@@ -222,7 +232,7 @@ export function BookingForm({
     // Database: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
     // JavaScript: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
     const dbDayOfWeek = jsDayOfWeek === 0 ? 6 : jsDayOfWeek - 1;
-    
+
     // Check if dentist has availability for this day of week
     // Try both conventions for compatibility (some data might use JS convention)
     return availability.some(a => {
@@ -238,7 +248,7 @@ export function BookingForm({
     try {
       // Generate unique booking reference
       const bookingReference = generateBookingReference();
-      
+
       logger.info('Starting appointment booking', {
         dentistId,
         dentistName,
@@ -247,7 +257,7 @@ export function BookingForm({
         appointmentTime: data.time,
         isAuthenticated: !!user,
       });
-      
+
       // Create appointment directly in Supabase with comprehensive logging
       // Allow both authenticated and anonymous bookings
       const appointmentData = {
@@ -271,7 +281,7 @@ export function BookingForm({
         booking_reference: bookingReference,
         booking_source: user ? 'manual' : 'guest', // Track if guest or authenticated booking
       };
-      
+
       const appointment = await withDatabaseLogging(
         DatabaseOperation.INSERT,
         'appointments',
@@ -309,7 +319,7 @@ export function BookingForm({
       );
 
       const appointmentId = appointment.id;
-      
+
       logger.success('Appointment created successfully', {
         appointmentId,
         bookingReference,
@@ -325,81 +335,68 @@ export function BookingForm({
       // Generate PDF and send notifications (non-blocking, optional)
       // Note: PDF generation is currently disabled to prevent booking failures
       // The booking should succeed even if PDF generation fails
-      logger.info('Appointment created successfully - PDF generation skipped', { 
+      logger.info('Appointment created successfully - PDF generation skipped', {
         appointmentId,
         note: 'PDF generation endpoint may not be configured'
       });
 
-      // Handle payment method
-      if (data.paymentMethod === "stripe") {
-        // Initiate Stripe Checkout
-        logger.info('Initiating Stripe checkout', { appointmentId });
-        
-        toast({
-          title: "Redirecting to payment...",
-          description: "Please complete your payment to confirm the appointment.",
-        });
-
-        try {
-          await initiateCheckout({
-            appointmentId,
-            amount: 5000, // $50.00 in cents - this should be configurable
-            currency: "usd",
-            dentistName,
-            patientEmail: data.patientEmail,
-            appointmentDate: format(data.date, "yyyy-MM-dd"),
-            appointmentTime: data.time,
-          });
-          
-          logger.success('Stripe checkout initiated', { appointmentId });
-        } catch (stripeErr) {
-          // Handle Stripe-specific errors
-          logger.error('Stripe checkout failed', stripeErr, { appointmentId });
-          
-          const stripeError = handleApplicationError(stripeErr, 'Stripe checkout initialization');
-          const stripeErrorMessage = formatErrorForUser(stripeError);
-          
-          setError(stripeErrorMessage);
-          
-          toast({
-            title: "Payment Error",
-            description: stripeErrorMessage,
-            variant: "destructive",
-          });
-          
+      // Handle card payment processing simulation
+      if (data.paymentMethod === 'card') {
+        if (!isCardValid || !cardData) {
+          setError('Please enter valid card details');
           setIsSubmitting(false);
           return;
         }
-      } else {
-        // Cash payment - show success immediately
-        logger.success('Cash payment appointment confirmed', { appointmentId });
-        
-        // Refresh booked slots to update availability
-        refetchBookedSlots();
-        
-        toast({
-          title: "Appointment booked successfully!",
-          description: "Your appointment has been confirmed. Please bring payment to your appointment.",
+
+        // Simulate payment processing (2 second delay)
+        setIsProcessingPayment(true);
+        logger.info('Processing card payment', {
+          cardType: cardData.cardType,
+          lastFour: cardData.lastFourDigits,
         });
 
-        if (onSuccess) {
-          onSuccess({
-            appointmentId,
-            date: format(data.date, "yyyy-MM-dd"),
-            time: data.time,
-            paymentMethod: data.paymentMethod,
-            paymentStatus: "pending",
-          });
-        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        setIsProcessingPayment(false);
 
-        // Reset form after successful submission
-        form.reset();
+        toast({
+          title: "Payment Successful!",
+          description: `Card ending in ${cardData.lastFourDigits} was charged $${selectedTypePrice}.00`,
+        });
       }
+
+      // Payment successful - now create appointment
+      logger.success('Payment processed successfully', {
+        appointmentId,
+        paymentMethod: data.paymentMethod,
+      });
+
+      // Refresh booked slots to update availability
+      refetchBookedSlots();
+
+      toast({
+        title: "Appointment booked successfully!",
+        description: data.paymentMethod === 'card'
+          ? "Your appointment has been confirmed. Payment received."
+          : "Your appointment has been confirmed. Please bring payment to your appointment.",
+      });
+
+      if (onSuccess) {
+        onSuccess({
+          appointmentId,
+          date: format(data.date, "yyyy-MM-dd"),
+          time: data.time,
+          paymentMethod: data.paymentMethod,
+          paymentStatus: data.paymentMethod === 'card' ? "paid" : "pending",
+        });
+      }
+
+      // Reset form after successful submission
+      form.reset();
     } catch (err: any) {
       // Enhanced error handling with detailed classification
       let bookingError: BookingError;
       let errorMessage: string;
-      
+
       // Check if this is a slot unavailable error with alternative slots (from backend API)
       if (err?.response?.status === 409 && err?.response?.data?.error?.details?.alternativeSlots) {
         const alternatives = err.response.data.error.details.alternativeSlots;
@@ -414,7 +411,7 @@ export function BookingForm({
             return displayTime;
           })
           .join(", ");
-        
+
         errorMessage = `This time slot was just booked by another patient. Available times: ${alternativeTimesText}${alternatives.length > 3 ? " and more" : ""}. Please select a different time.`;
         bookingError = new BookingError(
           'Slot conflict with alternative suggestions',
@@ -422,7 +419,7 @@ export function BookingForm({
           { alternativeSlots: alternatives },
           errorMessage
         );
-        
+
         logger.warn('Booking slot conflict', {
           dentistId,
           requestedDate: format(data.date, "yyyy-MM-dd"),
@@ -438,7 +435,7 @@ export function BookingForm({
         bookingError = handleApplicationError(err, 'Booking form submission');
         errorMessage = formatErrorForUser(bookingError);
       }
-      
+
       // Log the structured error using the comprehensive logger
       logger.error('Booking submission failed', bookingError, {
         code: bookingError.code,
@@ -453,9 +450,9 @@ export function BookingForm({
         paymentMethod: data.paymentMethod,
         errorCode: bookingError.code,
       });
-      
+
       setError(errorMessage);
-      
+
       toast({
         title: "Booking Failed",
         description: errorMessage,
@@ -606,8 +603,8 @@ export function BookingForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    {selectedType && selectedType !== "" 
-                      ? "Additional Details" 
+                    {selectedType && selectedType !== ""
+                      ? "Additional Details"
                       : "Describe Your Symptoms *"}
                   </FormLabel>
                   <FormControl>
@@ -669,13 +666,13 @@ export function BookingForm({
                           const today = new Date();
                           today.setHours(0, 0, 0, 0);
                           if (date < today) return true;
-                          
+
                           // Disable if submitting
                           if (isSubmitting || isStripeProcessing) return true;
-                          
+
                           // Disable if dentist is not available on this day
                           if (!isDateAvailable(date)) return true;
-                          
+
                           return false;
                         }}
                         initialFocus
@@ -710,8 +707,8 @@ export function BookingForm({
                     <SelectContent>
                       {displayTimeSlots.length > 0 ? (
                         displayTimeSlots.map((slot) => (
-                          <SelectItem 
-                            key={slot.value} 
+                          <SelectItem
+                            key={slot.value}
                             value={slot.value}
                             disabled={slot.disabled}
                           >
@@ -720,9 +717,9 @@ export function BookingForm({
                         ))
                       ) : (
                         <SelectItem value="no-slots" disabled>
-                          {selectedDate 
-                            ? (isLoadingAvailability 
-                              ? "Loading available times..." 
+                          {selectedDate
+                            ? (isLoadingAvailability
+                              ? "Loading available times..."
                               : availability && availability.length === 0
                                 ? "Dentist has no availability set. Please contact directly."
                                 : "No available time slots for this date")
@@ -732,8 +729,8 @@ export function BookingForm({
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    {availableTimeSlots.length > 0 
-                      ? "Available time slots based on dentist's schedule" 
+                    {availableTimeSlots.length > 0
+                      ? "Available time slots based on dentist's schedule"
                       : "Choose your preferred appointment time"}
                   </FormDescription>
                   <FormMessage />
@@ -752,48 +749,73 @@ export function BookingForm({
                     <RadioGroup
                       onValueChange={field.onChange}
                       defaultValue={field.value}
-                      className="flex flex-col space-y-2"
-                      disabled={isSubmitting || isStripeProcessing}
+                      className="flex flex-col space-y-3"
+                      disabled={isSubmitting || isProcessingPayment}
                     >
-                      <div className="flex items-start space-x-3 space-y-0 rounded-lg border p-4 hover:bg-accent cursor-pointer">
-                        <RadioGroupItem value="cash" id="cash" className="mt-1" disabled={isSubmitting || isStripeProcessing} />
-                        <div className="flex-1">
-                          <Label
-                            htmlFor="cash"
-                            className="font-medium cursor-pointer flex items-center gap-2"
-                          >
-                            <Banknote className="h-4 w-4" />
-                            Cash Payment
-                          </Label>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Pay at your appointment
-                          </p>
-                        </div>
+                      {/* Cash Option */}
+                      <div className="flex items-start space-x-3 space-y-0">
+                        <RadioGroupItem value="cash" id="cash" />
+                        <Label
+                          htmlFor="cash"
+                          className={cn(
+                            "flex-1 rounded-lg border p-4 cursor-pointer transition-colors",
+                            field.value === "cash" ? "border-primary bg-primary/5" : "border-input hover:bg-accent/50"
+                          )}
+                        >
+                          <div className="flex items-start gap-3">
+                            <Banknote className="h-5 w-5 text-primary mt-0.5" />
+                            <div className="flex-1">
+                              <p className="font-medium flex items-center gap-2">
+                                Cash Payment
+                                {field.value === "cash" && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                              </p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Pay at your appointment - ${selectedTypePrice}.00
+                              </p>
+                            </div>
+                          </div>
+                        </Label>
                       </div>
-                      <div className="flex items-start space-x-3 space-y-0 rounded-lg border p-4 hover:bg-accent cursor-pointer">
-                        <RadioGroupItem value="stripe" id="stripe" className="mt-1" disabled={isSubmitting || isStripeProcessing} />
-                        <div className="flex-1">
-                          <Label
-                            htmlFor="stripe"
-                            className="font-medium cursor-pointer flex items-center gap-2"
-                          >
-                            <CreditCard className="h-4 w-4" />
-                            Credit/Debit Card
-                          </Label>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Secure online payment with Stripe
-                          </p>
-                        </div>
+
+                      {/* Card Option */}
+                      <div className="flex items-start space-x-3 space-y-0">
+                        <RadioGroupItem value="card" id="card" />
+                        <Label
+                          htmlFor="card"
+                          className={cn(
+                            "flex-1 rounded-lg border p-4 cursor-pointer transition-colors",
+                            field.value === "card" ? "border-primary bg-primary/5" : "border-input hover:bg-accent/50"
+                          )}
+                        >
+                          <div className="flex items-start gap-3">
+                            <CreditCard className="h-5 w-5 text-primary mt-0.5" />
+                            <div className="flex-1">
+                              <p className="font-medium flex items-center gap-2">
+                                Card Payment
+                                {field.value === "card" && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                              </p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Pay now with Visa, MasterCard, or Amex - ${selectedTypePrice}.00
+                              </p>
+                            </div>
+                          </div>
+                        </Label>
                       </div>
                     </RadioGroup>
                   </FormControl>
-                  <FormDescription>
-                    Choose how you would like to pay for your appointment ($50.00)
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* Card Payment Form - Show when card is selected */}
+            {form.watch("paymentMethod") === "card" && (
+              <CardPaymentForm
+                onCardDataChange={handleCardDataChange}
+                disabled={isSubmitting}
+                isProcessing={isProcessingPayment}
+              />
+            )}
 
             {/* Error Message */}
             {(error || stripeError) && (
@@ -812,19 +834,19 @@ export function BookingForm({
             <Button
               type="submit"
               className="w-full"
-              disabled={isSubmitting || isStripeProcessing}
+              disabled={isSubmitting || isProcessingPayment || (form.watch("paymentMethod") === "card" && !isCardValid)}
             >
-              {isSubmitting || isStripeProcessing ? (
+              {isSubmitting || isProcessingPayment ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isStripeProcessing ? "Redirecting to payment..." : "Booking Appointment..."}
+                  {isProcessingPayment ? "Processing Payment..." : "Booking Appointment..."}
                 </>
               ) : (
                 <>
-                  {form.watch("paymentMethod") === "stripe" ? (
+                  {form.watch("paymentMethod") === "card" ? (
                     <>
                       <CreditCard className="mr-2 h-4 w-4" />
-                      Continue to Payment
+                      Pay ${selectedTypePrice}.00 & Book
                     </>
                   ) : (
                     "Book Appointment"

@@ -195,57 +195,24 @@ export function ServiceBookingModal({
 
       const appointmentId = appointment.id;
 
-      // Handle payment method
-      if (data.paymentMethod === "stripe") {
-        toast({
-          title: "Redirecting to payment...",
-          description: "Please complete your payment to confirm the appointment.",
+      // Cash payment - always used now
+      toast({
+        title: "Service booked successfully!",
+        description: `Your ${service.name} appointment with ${dentist.name} has been confirmed for ${format(data.date, "PPP")} at ${data.time}.`,
+      });
+
+      if (onSuccess) {
+        onSuccess({
+          appointmentId,
+          date: format(data.date, "yyyy-MM-dd"),
+          time: data.time,
+          paymentMethod: "cash",
+          paymentStatus: "pending",
         });
-
-        try {
-          await initiateCheckout({
-            appointmentId,
-            amount: service.price_min * 100, // Convert to cents
-            currency: "usd",
-            dentistName: dentist.name,
-            patientEmail: data.patientEmail,
-            appointmentDate: format(data.date, "yyyy-MM-dd"),
-            appointmentTime: data.time,
-          });
-        } catch (stripeErr) {
-          const stripeErrorMessage = stripeErr instanceof Error
-            ? stripeErr.message
-            : "Payment initialization failed. Please try again.";
-
-          setError(stripeErrorMessage);
-          toast({
-            title: "Payment Error",
-            description: stripeErrorMessage,
-            variant: "destructive",
-          });
-          setIsSubmitting(false);
-          return;
-        }
-      } else {
-        // Cash payment - show success
-        toast({
-          title: "Service booked successfully!",
-          description: `Your ${service.name} appointment with ${dentist.name} has been confirmed for ${format(data.date, "PPP")} at ${data.time}.`,
-        });
-
-        if (onSuccess) {
-          onSuccess({
-            appointmentId,
-            date: format(data.date, "yyyy-MM-dd"),
-            time: data.time,
-            paymentMethod: data.paymentMethod,
-            paymentStatus: "pending",
-          });
-        }
-
-        form.reset();
-        onOpenChange(false);
       }
+
+      form.reset();
+      onOpenChange(false);
     } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : "Failed to book service. Please try again.";
       setError(errorMessage);
@@ -412,7 +379,7 @@ export function ServiceBookingModal({
                 />
               </div>
 
-              {/* Payment Method */}
+              {/* Payment Method - Cash Only */}
               <FormField
                 control={form.control}
                 name="paymentMethod"
@@ -420,41 +387,19 @@ export function ServiceBookingModal({
                   <FormItem className="space-y-3">
                     <FormLabel>Payment Method</FormLabel>
                     <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-col space-y-2"
-                        disabled={isSubmitting || isStripeProcessing}
-                      >
-                        <div className="flex items-start space-x-3 space-y-0 rounded-lg border p-4 hover:bg-accent cursor-pointer">
-                          <RadioGroupItem value="cash" id="cash" className="mt-1" />
-                          <div className="flex-1">
-                            <Label htmlFor="cash" className="font-medium cursor-pointer flex items-center gap-2">
-                              <Banknote className="h-4 w-4" />
-                              Cash Payment
-                            </Label>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              Pay at your appointment
-                            </p>
-                          </div>
+                      <div className="flex items-start space-x-3 space-y-0 rounded-lg border p-4 bg-accent/50">
+                        <Banknote className="h-5 w-5 text-primary mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-medium flex items-center gap-2">
+                            Cash Payment
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Pay at your appointment - ${service.price_min}{service.price_max ? ` - $${service.price_max}` : ''}
+                          </p>
                         </div>
-                        <div className="flex items-start space-x-3 space-y-0 rounded-lg border p-4 hover:bg-accent cursor-pointer">
-                          <RadioGroupItem value="stripe" id="stripe" className="mt-1" />
-                          <div className="flex-1">
-                            <Label htmlFor="stripe" className="font-medium cursor-pointer flex items-center gap-2">
-                              <CreditCard className="h-4 w-4" />
-                              Credit/Debit Card
-                            </Label>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              Secure online payment with Stripe
-                            </p>
-                          </div>
-                        </div>
-                      </RadioGroup>
+                      </div>
                     </FormControl>
-                    <FormDescription>
-                      Choose how you would like to pay (${service.price_min}{service.price_max ? ` - $${service.price_max}` : ''})
-                    </FormDescription>
+                    <input type="hidden" {...field} value="cash" />
                     <FormMessage />
                   </FormItem>
                 )}
