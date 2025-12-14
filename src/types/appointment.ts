@@ -11,7 +11,7 @@ export type AppointmentStatus = 'pending' | 'confirmed' | 'upcoming' | 'complete
 /**
  * Payment method enum
  */
-export type PaymentMethod = 'stripe' | 'cash';
+export type PaymentMethod = 'card' | 'cash';
 
 /**
  * Payment status enum

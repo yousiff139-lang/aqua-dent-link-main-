@@ -38,6 +38,8 @@ const envSchema = z.object({
         'http://localhost:5173',   // vite default / user web
         'http://localhost:5174',   // dentist portal
         'http://localhost:8080',   // alt user portal port
+        'http://localhost:8081',   // vite user portal
+        'http://localhost:8082',   // vite user portal alternate
       ].join(',')
     ),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),

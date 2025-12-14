@@ -1129,58 +1129,61 @@ export class AdminService {
    */
   async getExportData(): Promise<any> {
     try {
-      // Fetch all patients
-      const { data: patients, error: patientsError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, phone, created_at')
-        .eq('role', 'patient')
-        .order('created_at', { ascending: false });
+      // Fetch all data in parallel for maximum speed
+      const [
+        { data: patients, error: patientsError },
+        { data: dentists, error: dentistsError },
+        { data: appointments, error: appointmentsError }
+      ] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, full_name, email, phone, created_at')
+          .eq('role', 'patient')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('dentists')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('appointments')
+          .select('id, patient_id, dentist_id, status, payment_status, symptoms, reason, appointment_date')
+          .order('appointment_date', { ascending: false })
+      ]);
 
       if (patientsError) {
         logger.error('Error fetching patients for export', { error: patientsError });
       }
-
-      // Count appointments per patient
-      const patientsWithCounts = await Promise.all(
-        (patients || []).map(async (patient) => {
-          const { count } = await supabase
-            .from('appointments')
-            .select('*', { count: 'exact', head: true })
-            .eq('patient_id', patient.id);
-          return { ...patient, total_appointments: count || 0 };
-        })
-      );
-
-      // Fetch all dentists
-      const { data: dentists, error: dentistsError } = await supabase
-        .from('dentists')
-        .select('*')
-        .order('created_at', { ascending: false });
-
       if (dentistsError) {
         logger.error('Error fetching dentists for export', { error: dentistsError });
       }
-
-      // Count appointments per dentist
-      const dentistsWithCounts = await Promise.all(
-        (dentists || []).map(async (dentist) => {
-          const { count } = await supabase
-            .from('appointments')
-            .select('*', { count: 'exact', head: true })
-            .eq('dentist_id', dentist.id);
-          return { ...dentist, total_appointments: count || 0 };
-        })
-      );
-
-      // Fetch all appointments
-      const { data: appointments, error: appointmentsError } = await supabase
-        .from('appointments')
-        .select('*')
-        .order('appointment_date', { ascending: false });
-
       if (appointmentsError) {
         logger.error('Error fetching appointments for export', { error: appointmentsError });
       }
+
+      // Count appointments per patient in memory (FAST - no extra queries!)
+      const patientAppointmentCounts = new Map<string, number>();
+      const dentistAppointmentCounts = new Map<string, number>();
+
+      (appointments || []).forEach((apt) => {
+        if (apt.patient_id) {
+          patientAppointmentCounts.set(apt.patient_id, (patientAppointmentCounts.get(apt.patient_id) || 0) + 1);
+        }
+        if (apt.dentist_id) {
+          dentistAppointmentCounts.set(apt.dentist_id, (dentistAppointmentCounts.get(apt.dentist_id) || 0) + 1);
+        }
+      });
+
+      // Enrich patients with counts (no extra queries)
+      const patientsWithCounts = (patients || []).map((patient) => ({
+        ...patient,
+        total_appointments: patientAppointmentCounts.get(patient.id) || 0
+      }));
+
+      // Enrich dentists with counts (no extra queries)
+      const dentistsWithCounts = (dentists || []).map((dentist) => ({
+        ...dentist,
+        total_appointments: dentistAppointmentCounts.get(dentist.id) || 0
+      }));
 
       // Calculate summary statistics
       const totalPatients = patients?.length || 0;

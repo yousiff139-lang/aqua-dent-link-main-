@@ -309,6 +309,27 @@ flowchart TB
 - Node.js v18.0.0 or higher
 - Python 3.12 or higher
 - pnpm (recommended) or npm
+- Supabase account (free tier available)
+
+### 🗄️ Database Setup (Required)
+
+> [!IMPORTANT]
+> You **MUST** upload the database schema to Supabase before the application will work!
+
+1. Create a new project at [Supabase](https://supabase.com)
+2. Go to **SQL Editor** in your Supabase dashboard
+3. Open the file [`database/supabase_schema.sql`](./database/supabase_schema.sql)
+4. Copy and paste the entire SQL content into the SQL Editor
+5. Click **Run** to execute the schema
+
+This will create all the required tables:
+- `profiles` - User profiles
+- `dentists` - Dentist information
+- `appointments` - Booking records
+- `dental_services` - Available services
+- `dentist_availability` - Dentist schedules
+- `notifications` - User notifications
+- And more...
 
 ### Installation
 
@@ -386,7 +407,9 @@ aqua-dent-link-main/
 ├── admin-app/                    # Admin Panel (React + Vite)
 ├── dentist-portal/               # Dentist Dashboard (React + Vite)
 ├── dental-conditions-detection/  # AI Detection (FastAPI + Python)
-├── supabase/                     # Database & Edge Functions
+├── database/                     # Database Schema
+│   └── supabase_schema.sql       # ⚠️ Upload this to Supabase!
+├── supabase/                     # Supabase Edge Functions
 └── package.json                  # Root config (runs all services)
 ```
 
