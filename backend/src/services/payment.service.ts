@@ -18,7 +18,7 @@ export class PaymentService {
     // Initialize Stripe only if secret key is provided
     if (env.STRIPE_SECRET_KEY) {
       this.stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-        apiVersion: '2025-09-30.clover',
+        apiVersion: '2024-12-18.acacia' as any,
       });
       logger.info('Stripe initialized successfully');
     } else {
@@ -49,9 +49,9 @@ export class PaymentService {
       }
 
       // Determine success and cancel URLs
-      const successUrl = env.STRIPE_SUCCESS_URL || 
+      const successUrl = env.STRIPE_SUCCESS_URL ||
         `${env.CORS_ORIGIN.split(',')[0]}/booking-confirmation?session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = env.STRIPE_CANCEL_URL || 
+      const cancelUrl = env.STRIPE_CANCEL_URL ||
         `${env.CORS_ORIGIN.split(',')[0]}/booking-cancelled`;
 
       // Create Stripe Checkout session
@@ -353,9 +353,9 @@ export class PaymentService {
 
       // Update payment transaction record
       const payment = await paymentRepository.findByAppointmentId(appointmentId);
-      
+
       if (payment) {
-        const transactionStatus: PaymentTransactionStatus = 
+        const transactionStatus: PaymentTransactionStatus =
           status === 'paid' ? 'succeeded' : 'failed';
 
         await paymentRepository.updateStatus(payment.id, {
@@ -376,7 +376,7 @@ export class PaymentService {
           if (details.stripePaymentIntentId && !appointment.stripe_payment_intent_id) {
             updateData.stripe_payment_intent_id = details.stripePaymentIntentId;
           }
-          
+
           // Only update if there's something to update
           if (Object.keys(updateData).length > 0) {
             // We need to use raw Supabase update since our repository doesn't support these fields
@@ -411,7 +411,7 @@ export class PaymentService {
   async getPaymentDetails(appointmentId: string) {
     try {
       const payment = await paymentRepository.findByAppointmentId(appointmentId);
-      
+
       if (!payment) {
         return null;
       }
@@ -449,7 +449,7 @@ export class PaymentService {
         signature,
         env.STRIPE_WEBHOOK_SECRET
       );
-      
+
       return true;
     } catch (error) {
       logger.error('Webhook signature verification failed', { error });

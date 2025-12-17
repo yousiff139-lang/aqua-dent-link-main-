@@ -16,7 +16,7 @@ export default function CreateProfile() {
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
-  
+
   const [formData, setFormData] = useState({
     specialization: '',
     bio: '',
@@ -52,7 +52,7 @@ export default function CreateProfile() {
 
       const userId = userData.id
 
-      const { data, error } = await supabase
+      const { data, error: _fetchError } = await supabase
         .from('dentists')
         .select('*')
         .eq('id', userId)
@@ -76,7 +76,7 @@ export default function CreateProfile() {
         })
         setIsEditing(true)
       }
-    } catch (error) {
+    } catch (_error) {
       // Profile doesn't exist yet, that's okay
     }
   }

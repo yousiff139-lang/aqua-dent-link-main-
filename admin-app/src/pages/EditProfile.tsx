@@ -224,7 +224,6 @@ export default function EditProfile() {
         title: 'Error',
         description: errorMessage,
         variant: 'destructive',
-        duration: 5000,
       })
     } finally {
       setIsSaving(false)

@@ -13,7 +13,7 @@ export class ProfilesController {
    * Get current user's profile
    */
   getCurrentUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user.id;
+    const userId = req.user?.id;
 
     try {
       const { data, error } = await supabase
@@ -42,7 +42,7 @@ export class ProfilesController {
    * Update current user's profile
    */
   updateCurrentUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user.id;
+    const userId = req.user?.id;
 
     // Validate request body
     const validatedData = validationService.validateProfileUpdate(req.body);
@@ -103,7 +103,7 @@ export class ProfilesController {
     logger.info('Dentists listed', {
       count: dentists.length,
       filters,
-      userId: req.user.id,
+      userId: req.user?.id,
     });
 
     res.json({
@@ -129,7 +129,7 @@ export class ProfilesController {
 
     logger.info('Dentist profile retrieved', {
       dentistId: id,
-      userId: req.user.id,
+      userId: req.user?.id,
     });
 
     res.json(dentist);

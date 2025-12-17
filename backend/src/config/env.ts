@@ -2,15 +2,16 @@ import dotenv from 'dotenv';
 import { z } from 'zod';
 
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 // Load environment variables
 dotenv.config();
 
-// Also try to load from root directory
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+// Also try to load from root directory (works for both ESM and CommonJS)
+const rootEnvPath = path.resolve(process.cwd(), '.env');
+dotenv.config({ path: rootEnvPath });
+// Also try parent directories
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 
 // Environment variable schema
 const envSchema = z.object({

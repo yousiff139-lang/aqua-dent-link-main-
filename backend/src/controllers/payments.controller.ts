@@ -60,11 +60,12 @@ export class PaymentsController {
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
+        const issues = (error as any).issues || (error as any).errors || [];
         logger.warn('Validation error in create checkout session', {
-          errors: error.errors,
+          errors: issues,
         });
         throw AppError.validation('Invalid request data', {
-          errors: error.errors,
+          errors: issues,
         });
       }
 

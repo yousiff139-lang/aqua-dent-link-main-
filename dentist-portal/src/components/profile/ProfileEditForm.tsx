@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Dentist } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, X } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Save, X, Camera, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
@@ -24,7 +25,62 @@ const ProfileEditForm = ({ dentist, onSave, onCancel }: ProfileEditFormProps) =>
     education: dentist.education || '',
     bio: dentist.bio || '',
   });
+  const [avatarUrl, setAvatarUrl] = useState(dentist.photo_url || dentist.image_url);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload a valid image (JPG, PNG, WebP, or GIF)');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `dentist-avatars/${dentist.id}_${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('medical-documents')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('medical-documents')
+        .getPublicUrl(fileName);
+
+      setAvatarUrl(urlData.publicUrl);
+      toast.success('Profile picture uploaded! Click Save to apply changes.');
+    } catch (error: any) {
+      console.error('Avatar upload error:', error);
+      toast.error(error.message || 'Failed to upload image');
+    } finally {
+      setIsUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +88,7 @@ const ProfileEditForm = ({ dentist, onSave, onCancel }: ProfileEditFormProps) =>
     const loadingToast = toast.loading('Saving profile...');
 
     try {
-      // Update in dentists table
+      // Update in dentists table (including image URL)
       const { error: dentistError } = await supabase
         .from('dentists')
         .update({
@@ -40,9 +96,11 @@ const ProfileEditForm = ({ dentist, onSave, onCancel }: ProfileEditFormProps) =>
           email: formData.email,
           specialization: formData.specialization,
           years_of_experience: formData.years_of_experience,
-          experience_years: formData.years_of_experience, // Support both column names
+          experience_years: formData.years_of_experience,
           education: formData.education,
           bio: formData.bio,
+          image_url: avatarUrl,
+          profile_picture: avatarUrl,
           updated_at: new Date().toISOString(),
         })
         .eq('id', dentist.id);
@@ -57,24 +115,22 @@ const ProfileEditForm = ({ dentist, onSave, onCancel }: ProfileEditFormProps) =>
         .single();
 
       if (profileData) {
-        const { error: profileError } = await supabase
+        await supabase
           .from('profiles')
           .update({
             full_name: formData.full_name,
             email: formData.email,
+            avatar_url: avatarUrl,
             updated_at: new Date().toISOString(),
           })
           .eq('id', dentist.id);
-
-        if (profileError) {
-          console.warn('Profile update warning:', profileError);
-          // Don't fail if profile doesn't exist
-        }
       }
 
       const updatedDentist: Dentist = {
         ...dentist,
         ...formData,
+        photo_url: avatarUrl,
+        image_url: avatarUrl,
       };
 
       toast.success('Profile updated successfully!', { id: loadingToast });
@@ -95,6 +151,40 @@ const ProfileEditForm = ({ dentist, onSave, onCancel }: ProfileEditFormProps) =>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Avatar Upload Section */}
+          <div className="flex items-center gap-4 pb-4 border-b">
+            <div className="relative group">
+              <Avatar className="h-24 w-24 cursor-pointer" onClick={handleAvatarClick}>
+                <AvatarImage src={avatarUrl} alt={formData.full_name} />
+                <AvatarFallback className="text-xl bg-primary text-primary-foreground">
+                  {getInitials(formData.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div
+                className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                onClick={handleAvatarClick}
+              >
+                {isUploadingAvatar ? (
+                  <Loader2 className="h-8 w-8 text-white animate-spin" />
+                ) : (
+                  <Camera className="h-8 w-8 text-white" />
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+            </div>
+            <div>
+              <Label className="text-base font-semibold">Profile Picture</Label>
+              <p className="text-sm text-muted-foreground">Click the avatar to upload a new photo</p>
+              <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WebP or GIF (max 5MB)</p>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="full_name">Full Name</Label>
             <Input
@@ -159,7 +249,7 @@ const ProfileEditForm = ({ dentist, onSave, onCancel }: ProfileEditFormProps) =>
           </div>
 
           <div className="flex items-center gap-2 pt-4">
-            <Button type="submit" disabled={isSaving}>
+            <Button type="submit" disabled={isSaving || isUploadingAvatar}>
               <Save className="h-4 w-4 mr-2" />
               {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
@@ -175,4 +265,5 @@ const ProfileEditForm = ({ dentist, onSave, onCancel }: ProfileEditFormProps) =>
 };
 
 export default ProfileEditForm;
+
 

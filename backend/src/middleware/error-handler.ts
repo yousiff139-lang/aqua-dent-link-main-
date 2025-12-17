@@ -42,12 +42,14 @@ export const errorHandler = (
 
   // Handle Zod validation errors
   if (error instanceof ZodError) {
+    // Get issues (works with both Zod v3 and v4)
+    const issues = (error as any).issues || (error as any).errors || [];
     const errorResponse: ErrorResponse = {
       error: {
         code: ErrorCode.VALIDATION_ERROR,
         message: 'Validation failed',
         details: {
-          issues: error.errors.map(err => ({
+          issues: issues.map((err: any) => ({
             path: err.path.join('.'),
             message: err.message,
           })),
@@ -61,7 +63,7 @@ export const errorHandler = (
       userId: (req as any).userId || 'anonymous',
       path: req.path,
       method: req.method,
-      errors: error.errors,
+      errors: issues,
     });
 
     res.status(400).json(errorResponse);

@@ -42,11 +42,23 @@ export default function XRayViewer({
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
+        // Convert Supabase storage path to public URL if needed
+        let actualImageUrl = imageUrl;
+        if (!imageUrl.startsWith('http')) {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            if (supabaseUrl) {
+                // Try medical-documents bucket
+                actualImageUrl = `${supabaseUrl}/storage/v1/object/public/medical-documents/${imageUrl}`;
+            }
+        }
+
+        console.log('Loading X-ray image from:', actualImageUrl);
+
         const img = new Image();
         img.crossOrigin = 'anonymous';
-        img.src = imageUrl;
 
         img.onload = () => {
+            console.log('Image loaded successfully');
             setLoadedImage(img);
 
             // Set canvas size
@@ -55,6 +67,29 @@ export default function XRayViewer({
 
             drawOverlay(img);
         };
+
+        img.onerror = (error) => {
+            console.error('Failed to load image:', error);
+            // Try xray-uploads bucket as fallback
+            if (!imageUrl.startsWith('http')) {
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                if (supabaseUrl) {
+                    const fallbackUrl = `${supabaseUrl}/storage/v1/object/public/xray-uploads/${imageUrl}`;
+                    console.log('Retrying with xray-uploads bucket:', fallbackUrl);
+                    const fallbackImg = new Image();
+                    fallbackImg.crossOrigin = 'anonymous';
+                    fallbackImg.onload = () => {
+                        setLoadedImage(fallbackImg);
+                        canvas.width = fallbackImg.width;
+                        canvas.height = fallbackImg.height;
+                        drawOverlay(fallbackImg);
+                    };
+                    fallbackImg.src = fallbackUrl;
+                }
+            }
+        };
+
+        img.src = actualImageUrl;
     }, [imageUrl]);
 
     useEffect(() => {

@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import axios from 'axios';
 import {
     FileImage, Upload, AlertCircle, Loader2,
-    Stethoscope, ZoomIn, ZoomOut, RotateCw, Trash2
+    Stethoscope, ZoomIn, ZoomOut, RotateCw, Trash2, Download
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { generateXRayReport } from '@/utils/pdf';
 
 // Dental AI Backend URL - same as original
 const API_URL = 'http://localhost:8000/api/v1';
@@ -166,6 +167,29 @@ export default function XRayLab() {
             // Don't crash the component - just show error toast
         } finally {
             setIsGeneratingReport(false);
+        }
+    };
+
+    // Export X-ray analysis as PDF
+    const handleExportPDF = (xray: UploadedXray) => {
+        if (!xray.predictions) {
+            toast.error('No analysis results to export');
+            return;
+        }
+
+        try {
+            generateXRayReport({
+                fileName: xray.file.name,
+                analysisDate: new Date(),
+                detections: xray.predictions || [],
+                diagnosticReport: xray.diagnosticReport,
+                imageInfo: xray.imageInfo,
+                metadata: xray.metadata,
+            });
+            toast.success('PDF exported successfully!');
+        } catch (error) {
+            console.error('Failed to export PDF:', error);
+            toast.error('Failed to export PDF');
         }
     };
 
@@ -407,6 +431,25 @@ export default function XRayLab() {
                                         ) : (
                                             <><Stethoscope className="h-4 w-4 mr-2" /> Generate Diagnosis</>
                                         )}
+                                    </Button>
+                                )}
+
+                            {/* Export PDF Button - shows when analysis is complete */}
+                            {selectedXray.status === 'success' &&
+                                selectedXray.predictions &&
+                                selectedXray.predictions.length > 0 && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleExportPDF(selectedXray);
+                                        }}
+                                        className="gap-2"
+                                    >
+                                        <Download className="h-4 w-4" />
+                                        Export PDF
                                     </Button>
                                 )}
                         </div>

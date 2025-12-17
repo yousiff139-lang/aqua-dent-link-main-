@@ -8,6 +8,7 @@ import { AlertCircle, CheckCircle2, FileImage, RefreshCw } from 'lucide-react';
 import XRayViewer from './XRayViewer';
 import AnalysisResults from './AnalysisResults';
 import { useXRayAnalysis } from '../hooks/useXRayAnalysis';
+import { generateXRayReport } from '@/utils/pdf';
 import axios from 'axios';
 
 // Python AI Backend URL (same as X-Ray Lab uses)
@@ -96,45 +97,42 @@ export default function XRayAnalysisSection({
         setAnalysisError(null);
 
         try {
+            // Get the proper image URL
+            let imageUrl = selectedXray.file_url;
+
+            // If it's a relative path (Supabase storage path), convert to public URL
+            if (!imageUrl.startsWith('http')) {
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                if (supabaseUrl) {
+                    // Try medical-documents bucket first, then xray-uploads
+                    imageUrl = `${supabaseUrl}/storage/v1/object/public/medical-documents/${imageUrl}`;
+                }
+            }
+
+            console.log('Fetching image from URL:', imageUrl);
+
             // Fetch the image from the URL
-            const imageResponse = await fetch(selectedXray.file_url);
+            const imageResponse = await fetch(imageUrl);
+
+            if (!imageResponse.ok) {
+                // Try xray-uploads bucket as fallback
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                if (supabaseUrl && !selectedXray.file_url.startsWith('http')) {
+                    imageUrl = `${supabaseUrl}/storage/v1/object/public/xray-uploads/${selectedXray.file_url}`;
+                    console.log('Retrying with xray-uploads bucket:', imageUrl);
+                    const retryResponse = await fetch(imageUrl);
+                    if (!retryResponse.ok) {
+                        throw new Error(`Failed to fetch image: ${retryResponse.status}`);
+                    }
+                    const blob = await retryResponse.blob();
+                    await processAndAnalyze(blob, selectedXray.file_name || 'xray.png');
+                    return;
+                }
+                throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+            }
+
             const blob = await imageResponse.blob();
-
-            // Create a File from the blob
-            const fileName = selectedXray.file_name || 'xray.png';
-            const file = new File([blob], fileName, { type: blob.type || 'image/png' });
-
-            // Create FormData (same as X-Ray Lab)
-            const formData = new FormData();
-            formData.append('file', file);
-
-            // Determine endpoint based on file type
-            const ext = fileName.split('.').pop()?.toLowerCase() || '';
-            const isDicom = ['dcm', 'dicom', 'rvg'].includes(ext);
-            const endpoint = isDicom ? '/detect-dicom' : '/detect';
-
-            console.log(`Sending X-ray to Python AI backend: ${AI_API_URL}${endpoint}`);
-
-            // Call Python AI backend directly (same as X-Ray Lab)
-            const response = await axios.post(`${AI_API_URL}${endpoint}`, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
-
-            console.log('Analysis response:', response.data);
-
-            // Update selected X-ray with results
-            const predictions = response.data.predictions || [];
-            setSelectedXray(prev => prev ? {
-                ...prev,
-                xray_analysis_result: {
-                    predictions,
-                    image_info: response.data.image_info,
-                    metadata: response.data.metadata || response.data.dicom_metadata,
-                },
-                analysis_status: 'completed'
-            } : null);
+            await processAndAnalyze(blob, selectedXray.file_name || 'xray.png');
 
         } catch (err: any) {
             console.error('Analysis failed:', err);
@@ -142,6 +140,44 @@ export default function XRayAnalysisSection({
         } finally {
             setIsAnalyzing(false);
         }
+    };
+
+    // Helper function to process and analyze the image blob
+    const processAndAnalyze = async (blob: Blob, fileName: string) => {
+        // Create a File from the blob
+        const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' });
+
+        // Create FormData (same as X-Ray Lab)
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Determine endpoint based on file type
+        const ext = fileName.split('.').pop()?.toLowerCase() || '';
+        const isDicom = ['dcm', 'dicom', 'rvg'].includes(ext);
+        const endpoint = isDicom ? '/detect-dicom' : '/detect';
+
+        console.log(`Sending X-ray to Python AI backend: ${AI_API_URL}${endpoint}`);
+
+        // Call Python AI backend directly (same as X-Ray Lab)
+        const response = await axios.post(`${AI_API_URL}${endpoint}`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+
+        console.log('Analysis response:', response.data);
+
+        // Update selected X-ray with results
+        const predictions = response.data.predictions || [];
+        setSelectedXray(prev => prev ? {
+            ...prev,
+            xray_analysis_result: {
+                predictions,
+                image_info: response.data.image_info,
+                metadata: response.data.metadata || response.data.dicom_metadata,
+            },
+            analysis_status: 'completed'
+        } : null);
     };
 
     const handleGenerateReport = async () => {
@@ -194,8 +230,25 @@ export default function XRayAnalysisSection({
     };
 
     const handleExportReport = () => {
-        // TODO: Implement PDF export
-        console.log('Exporting report...');
+        if (!selectedXray?.xray_analysis_result) {
+            console.error('No analysis results to export');
+            return;
+        }
+
+        try {
+            generateXRayReport({
+                patientName: patientName,
+                fileName: selectedXray.file_name,
+                analysisDate: selectedXray.analyzed_at ? new Date(selectedXray.analyzed_at) : new Date(),
+                detections: selectedXray.xray_analysis_result.predictions || [],
+                diagnosticReport: selectedXray.xray_analysis_result.diagnostic_report,
+                imageInfo: selectedXray.xray_analysis_result.image_info,
+                metadata: selectedXray.xray_analysis_result.metadata,
+            });
+            console.log('PDF exported successfully');
+        } catch (error) {
+            console.error('Failed to export PDF:', error);
+        }
     };
 
     const getStatusBadge = (status?: string) => {

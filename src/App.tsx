@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,35 +7,58 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+
+// Loading component for suspense fallback
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-cyan-50">
+    <div className="text-center">
+      <div className="relative w-16 h-16 mx-auto mb-4">
+        <div className="absolute inset-0 rounded-full border-4 border-blue-200"></div>
+        <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+      </div>
+      <p className="text-gray-600 text-sm animate-pulse">Loading...</p>
+    </div>
+  </div>
+);
+
+// Lazy load pages for better code splitting
+// Critical pages - load immediately
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import ResetPassword from "./pages/ResetPassword";
-import Dashboard from "./pages/Dashboard";
-import ProfileSettings from "./pages/ProfileSettings";
-import DentistDashboard from "./pages/DentistDashboard";
-import EnhancedDentistDashboard from "./pages/EnhancedDentistDashboard";
-import DentistPortal from "./pages/DentistPortal";
-import Dentists from "./pages/Dentists";
-import EnhancedDentists from "./pages/EnhancedDentists";
-import Services from "./pages/Services";
-import Contact from "./pages/Contact";
-import NotFound from "./pages/NotFound";
-import Admin from "./pages/Admin";
-import EnhancedAdmin from "./pages/EnhancedAdmin";
-import DentistProfile from "./pages/DentistProfile";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import PaymentCancel from "./pages/PaymentCancel";
-import MyAppointments from "./pages/MyAppointments";
-import AuthCallback from "./pages/AuthCallback";
-import { PerformanceDashboard } from "./components/PerformanceDashboard";
 
+// Lazy load non-critical pages
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const ProfileSettings = lazy(() => import("./pages/ProfileSettings"));
+const DentistDashboard = lazy(() => import("./pages/DentistDashboard"));
+const EnhancedDentistDashboard = lazy(() => import("./pages/EnhancedDentistDashboard"));
+const DentistPortal = lazy(() => import("./pages/DentistPortal"));
+const Dentists = lazy(() => import("./pages/Dentists"));
+const EnhancedDentists = lazy(() => import("./pages/EnhancedDentists"));
+const Services = lazy(() => import("./pages/Services"));
+const Contact = lazy(() => import("./pages/Contact"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Admin = lazy(() => import("./pages/Admin"));
+const EnhancedAdmin = lazy(() => import("./pages/EnhancedAdmin"));
+const DentistProfile = lazy(() => import("./pages/DentistProfile"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const PaymentCancel = lazy(() => import("./pages/PaymentCancel"));
+const MyAppointments = lazy(() => import("./pages/MyAppointments"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const PerformanceDashboard = lazy(() =>
+  import("./components/PerformanceDashboard").then(m => ({ default: m.PerformanceDashboard }))
+);
+
+// Optimized QueryClient with aggressive caching
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 10 * 60 * 1000, // 10 minutes - data stays fresh longer
+      gcTime: 30 * 60 * 1000, // 30 minutes cache time
       refetchOnWindowFocus: false,
+      refetchOnReconnect: 'always',
     },
   },
 });
@@ -43,7 +67,7 @@ function AppContent() {
   useNetworkStatus();
 
   return (
-    <>
+    <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
@@ -65,7 +89,7 @@ function AppContent() {
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+    </Suspense>
   );
 }
 

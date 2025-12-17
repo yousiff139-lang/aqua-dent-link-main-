@@ -84,6 +84,27 @@ export default function AddDoctor() {
         availability: availability.length > 0 ? availability : undefined,
       }
 
+      // If there's an avatar file, convert to base64 and include in payload
+      if (avatarFile) {
+        const reader = new FileReader()
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(avatarFile)
+        })
+
+        try {
+          payload.image_url = await base64Promise
+        } catch (error) {
+          console.error('Failed to process avatar image:', error)
+          toast({
+            title: 'Image processing failed',
+            description: 'Could not process the avatar image. The dentist will be created without a profile picture.',
+            variant: 'destructive',
+          })
+        }
+      }
+
       const response = await api.post<CreateDentistResponse>('/admin/dentists', payload)
       setFormData(initialForm)
       setAvatarFile(null)
@@ -103,11 +124,11 @@ export default function AddDoctor() {
       }, 1500)
     } catch (error: any) {
       console.error('Error creating dentist:', error)
-      
+
       // Extract detailed error message from backend response
       let errorMessage = 'Please try again later.';
       let errorTitle = 'Failed to add dentist';
-      
+
       if (error.message) {
         errorMessage = error.message;
       } else if (error.response?.data?.error?.message) {
@@ -120,13 +141,13 @@ export default function AddDoctor() {
 
       // Detect service role key issues and provide actionable guidance
       const lowerMessage = errorMessage.toLowerCase();
-      if (lowerMessage.includes('service role key') || 
-          lowerMessage.includes('authentication configuration') ||
-          lowerMessage.includes('unexpected_failure') ||
-          lowerMessage.includes('eyj') ||
-          lowerMessage.includes('sb_')) {
+      if (lowerMessage.includes('service role key') ||
+        lowerMessage.includes('authentication configuration') ||
+        lowerMessage.includes('unexpected_failure') ||
+        lowerMessage.includes('eyj') ||
+        lowerMessage.includes('sb_')) {
         errorTitle = 'Configuration Error';
-        errorMessage = 
+        errorMessage =
           'The backend service role key is misconfigured. ' +
           'Please check the backend .env file and ensure SUPABASE_SERVICE_ROLE_KEY is set correctly. ' +
           'Get the service_role key from Supabase Dashboard > Settings > API > service_role key (secret). ' +
@@ -138,12 +159,11 @@ export default function AddDoctor() {
       } else if (lowerMessage.includes('password')) {
         errorTitle = 'Password Error';
       }
-      
+
       toast({
         title: errorTitle,
         description: errorMessage,
         variant: 'destructive',
-        duration: 8000, // Show longer for configuration errors
       })
     } finally {
       setIsSubmitting(false)

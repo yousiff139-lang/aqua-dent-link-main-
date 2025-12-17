@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { DashboardLayout } from '@/components/DashboardLayout'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, Clock, User, Download, Mail, Phone, Filter } from 'lucide-react'
@@ -42,7 +42,7 @@ export default function Appointments() {
 
   // Set up real-time subscription for instant updates
   useRealtimeAppointments(
-    user?.id,
+    (user as any)?.id,
     'admin',
     {
       onCreated: (newAppointment) => {
@@ -54,7 +54,7 @@ export default function Appointments() {
         setAppointments((prev) =>
           prev.map((apt) =>
             apt.id === updatedAppointment.id
-              ? { ...updatedAppointment, dentists: apt.dentists } as Appointment
+              ? { ...updatedAppointment } as Appointment
               : apt
           )
         )
@@ -70,12 +70,12 @@ export default function Appointments() {
   const loadAppointments = async () => {
     try {
       setLoading(true)
-      
+
       let loaded: Appointment[] | null = null
 
       // 1) Try backend API first
       try {
-      const response = await api.get<{ success: boolean; data: Appointment[] }>('/admin/appointments')
+        const response = await api.get<{ success: boolean; data: Appointment[] }>('/admin/appointments')
         const responseData = response as any
         const apiAppointments = responseData?.data
 
@@ -162,17 +162,17 @@ export default function Appointments() {
       const [hours, minutes] = timeStr.split(':')
       const date = new Date()
       date.setHours(parseInt(hours), parseInt(minutes))
-      return date.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit', 
-        hour12: true 
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
       })
     } catch {
       return timeStr
     }
   }
 
-  const filteredAppointments = appointments.filter(apt => 
+  const filteredAppointments = appointments.filter(apt =>
     statusFilter === 'all' || apt.status === statusFilter
   )
 

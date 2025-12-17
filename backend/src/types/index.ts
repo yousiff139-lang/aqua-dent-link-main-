@@ -9,7 +9,7 @@ export interface User {
 
 // Authenticated request with user
 export interface AuthenticatedRequest extends Request {
-  user: User;
+  user?: User;
 }
 
 // Appointment types

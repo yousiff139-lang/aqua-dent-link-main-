@@ -2,6 +2,12 @@ import { z } from 'zod';
 import { AppError } from '../utils/errors.js';
 import { logger } from '../config/logger.js';
 
+// Helper to extract issues from ZodError (works with both v3 and v4)
+const getZodIssues = (error: z.ZodError): z.ZodIssue[] => {
+  // In Zod v4, it's `error.issues`, in v3 it was `error.errors`
+  return (error as any).issues || (error as any).errors || [];
+};
+
 export class ValidationService {
   /**
    * Appointment validation schemas
@@ -16,7 +22,7 @@ export class ValidationService {
       reason: z.string().min(1, 'Reason for visit is required'),
       appointment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
       appointment_time: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, 'Time must be in HH:mm format'),
-      payment_method: z.enum(['stripe', 'cash'], { errorMap: () => ({ message: 'Payment method must be stripe or cash' }) }),
+      payment_method: z.enum(['stripe', 'cash']),
       notes: z.string().optional(),
       patient_notes: z.string().optional(),
       medical_history: z.string().optional(),
@@ -80,16 +86,17 @@ export class ValidationService {
   /**
    * Validate appointment creation data
    */
-  validateCreateAppointment(data: any): any {
+  validateCreateAppointment(data: unknown): z.infer<typeof this.appointmentSchemas.create> {
     try {
       return this.appointmentSchemas.create.parse(data);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        const issues = getZodIssues(error);
         logger.warn('Appointment creation validation failed', {
-          errors: error.errors,
+          errors: issues,
         });
         throw AppError.validation('Invalid appointment data', {
-          issues: error.errors.map((err) => ({
+          issues: issues.map((err: z.ZodIssue) => ({
             path: err.path.join('.'),
             message: err.message,
           })),
@@ -102,16 +109,17 @@ export class ValidationService {
   /**
    * Validate appointment update data
    */
-  validateUpdateAppointment(data: any): any {
+  validateUpdateAppointment(data: unknown): z.infer<typeof this.appointmentSchemas.update> {
     try {
       return this.appointmentSchemas.update.parse(data);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        const issues = getZodIssues(error);
         logger.warn('Appointment update validation failed', {
-          errors: error.errors,
+          errors: issues,
         });
         throw AppError.validation('Invalid appointment update data', {
-          issues: error.errors.map((err) => ({
+          issues: issues.map((err: z.ZodIssue) => ({
             path: err.path.join('.'),
             message: err.message,
           })),
@@ -124,16 +132,17 @@ export class ValidationService {
   /**
    * Validate appointment filters
    */
-  validateAppointmentFilters(data: any): any {
+  validateAppointmentFilters(data: unknown): z.infer<typeof this.appointmentSchemas.filters> {
     try {
       return this.appointmentSchemas.filters.parse(data);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        const issues = getZodIssues(error);
         logger.warn('Appointment filters validation failed', {
-          errors: error.errors,
+          errors: issues,
         });
         throw AppError.validation('Invalid filter parameters', {
-          issues: error.errors.map((err) => ({
+          issues: issues.map((err: z.ZodIssue) => ({
             path: err.path.join('.'),
             message: err.message,
           })),
@@ -146,7 +155,7 @@ export class ValidationService {
   /**
    * Validate availability schedule
    */
-  validateAvailabilitySchedule(data: any): any {
+  validateAvailabilitySchedule(data: unknown): z.infer<typeof this.availabilitySchemas.schedule> {
     try {
       const validated = this.availabilitySchemas.schedule.parse(data);
 
@@ -165,11 +174,12 @@ export class ValidationService {
       return validated;
     } catch (error) {
       if (error instanceof z.ZodError) {
+        const issues = getZodIssues(error);
         logger.warn('Availability schedule validation failed', {
-          errors: error.errors,
+          errors: issues,
         });
         throw AppError.validation('Invalid availability schedule', {
-          issues: error.errors.map((err) => ({
+          issues: issues.map((err: z.ZodIssue) => ({
             path: err.path.join('.'),
             message: err.message,
           })),
@@ -182,16 +192,17 @@ export class ValidationService {
   /**
    * Validate slot query parameters
    */
-  validateSlotQuery(data: any): any {
+  validateSlotQuery(data: unknown): z.infer<typeof this.availabilitySchemas.slotQuery> {
     try {
       return this.availabilitySchemas.slotQuery.parse(data);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        const issues = getZodIssues(error);
         logger.warn('Slot query validation failed', {
-          errors: error.errors,
+          errors: issues,
         });
         throw AppError.validation('Invalid query parameters', {
-          issues: error.errors.map((err) => ({
+          issues: issues.map((err: z.ZodIssue) => ({
             path: err.path.join('.'),
             message: err.message,
           })),
@@ -204,16 +215,17 @@ export class ValidationService {
   /**
    * Validate profile update data
    */
-  validateProfileUpdate(data: any): any {
+  validateProfileUpdate(data: unknown): z.infer<typeof this.profileSchemas.update> {
     try {
       return this.profileSchemas.update.parse(data);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        const issues = getZodIssues(error);
         logger.warn('Profile update validation failed', {
-          errors: error.errors,
+          errors: issues,
         });
         throw AppError.validation('Invalid profile data', {
-          issues: error.errors.map((err) => ({
+          issues: issues.map((err: z.ZodIssue) => ({
             path: err.path.join('.'),
             message: err.message,
           })),

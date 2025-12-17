@@ -15,6 +15,8 @@ export interface AdminDentist {
   specialization?: string | null;
   phone?: string | null;
   status?: string | null;
+  image_url?: string | null;
+  profile_picture?: string | null;
   years_of_experience?: number | null;
   experience_years?: number | null;
   education?: string | null;
@@ -98,6 +100,7 @@ export interface CreateDentistPayload {
   years_of_experience?: number;
   bio?: string;
   education?: string;
+  image_url?: string; // Base64 encoded image for profile picture
   availability?: DayAvailability[]; // Optional weekly availability schedule
 }
 

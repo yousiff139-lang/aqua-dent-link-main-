@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, memo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { ServiceBookingModal } from "@/components/ServiceBookingModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { CardGridSkeleton } from "@/components/Skeleton";
 
 interface DentalService {
     id: string;
@@ -32,38 +34,117 @@ interface Dentist {
     image_url?: string;
 }
 
+// Fetch services with caching
+async function fetchServices(): Promise<DentalService[]> {
+    const { data, error } = await (supabase as any)
+        .from('dental_services')
+        .select('*')
+        .eq('is_active', true)
+        .order('price_min', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+}
+
+// Memoized service card component
+const ServiceCard = memo(function ServiceCard({
+    service,
+    onBook,
+}: {
+    service: DentalService;
+    onBook: (service: DentalService) => void;
+}) {
+    const formatPrice = (min: number, max: number | null) => {
+        if (!max || min === max) {
+            return `$${min.toFixed(0)}`;
+        }
+        return `$${min.toFixed(0)} - $${max.toFixed(0)}`;
+    };
+
+    const formatDuration = (minutes: number) => {
+        if (minutes < 60) {
+            return `${minutes} min`;
+        }
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return mins === 0 ? `${hours} hr` : `${hours}h ${mins}m`;
+    };
+
+    return (
+        <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+            {/* Service Image */}
+            <div className="relative h-48 bg-gradient-to-br from-blue-500 to-blue-600 overflow-hidden">
+                {service.image_url ? (
+                    <img
+                        src={service.image_url}
+                        alt={service.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                        <Star className="h-16 w-16 text-white/50" />
+                    </div>
+                )}
+                <div className="absolute top-4 right-4">
+                    <Badge variant="secondary" className="bg-white/90 backdrop-blur">
+                        {service.specialty}
+                    </Badge>
+                </div>
+            </div>
+
+            <CardHeader>
+                <CardTitle className="text-xl">{service.name}</CardTitle>
+                <CardDescription className="line-clamp-2">
+                    {service.description}
+                </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+                {/* Service Details */}
+                <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>{formatDuration(service.duration_minutes)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-semibold text-primary">
+                        <DollarSign className="h-4 w-4" />
+                        <span>{formatPrice(service.price_min, service.price_max)}</span>
+                    </div>
+                </div>
+
+                {/* Book Button */}
+                <Button
+                    className="w-full"
+                    onClick={() => onBook(service)}
+                >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Book This Service
+                </Button>
+            </CardContent>
+        </Card>
+    );
+});
+
 const Services = () => {
-    const [services, setServices] = useState<DentalService[]>([]);
-    const [loading, setLoading] = useState(true);
     const [selectedService, setSelectedService] = useState<DentalService | null>(null);
     const [selectedDentist, setSelectedDentist] = useState<Dentist | null>(null);
     const [showBookingModal, setShowBookingModal] = useState(false);
     const { user } = useAuth();
     const { toast } = useToast();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
-    useEffect(() => {
-        fetchServices();
-    }, []);
+    // Use React Query for services with caching
+    const { data: services = [], isLoading } = useQuery({
+        queryKey: ['dental-services'],
+        queryFn: fetchServices,
+        staleTime: 15 * 60 * 1000, // 15 minutes - services don't change often
+        gcTime: 60 * 60 * 1000, // 1 hour cache
+    });
 
-    const fetchServices = async () => {
-        try {
-            const { data, error } = await (supabase as any)
-                .from('dental_services')
-                .select('*')
-                .eq('is_active', true)
-                .order('price_min', { ascending: true });
-
-            if (error) throw error;
-            setServices(data || []);
-        } catch (error) {
-            console.error('Error fetching services:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleBookService = async (service: DentalService) => {
+    const handleBookService = useCallback(async (service: DentalService) => {
         if (!user) {
             toast({
                 title: "Sign in required",
@@ -113,9 +194,9 @@ const Services = () => {
                 variant: "destructive",
             });
         }
-    };
+    }, [user, toast, navigate]);
 
-    const handleBookingSuccess = (data: {
+    const handleBookingSuccess = useCallback((data: {
         appointmentId: string;
         date: string;
         time: string;
@@ -129,34 +210,7 @@ const Services = () => {
             title: "Service booked!",
             description: `Your ${selectedService?.name} appointment has been confirmed for ${data.date} at ${data.time}.`,
         });
-    };
-
-    const formatPrice = (min: number, max: number | null) => {
-        if (!max || min === max) {
-            return `$${min.toFixed(0)}`;
-        }
-        return `$${min.toFixed(0)} - $${max.toFixed(0)}`;
-    };
-
-    const formatDuration = (minutes: number) => {
-        if (minutes < 60) {
-            return `${minutes} min`;
-        }
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        return mins === 0 ? `${hours} hr` : `${hours}h ${mins}m`;
-    };
-
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                    <p className="mt-4 text-muted-foreground">Loading services...</p>
-                </div>
-            </div>
-        );
-    }
+    }, [selectedService?.name, toast]);
 
     return (
         <div className="min-h-screen flex flex-col">
@@ -172,61 +226,19 @@ const Services = () => {
                 </div>
 
                 {/* Services Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {services.map((service) => (
-                        <Card key={service.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                            {/* Service Image */}
-                            <div className="relative h-48 bg-gradient-to-br from-blue-500 to-blue-600 overflow-hidden">
-                                {service.image_url ? (
-                                    <img
-                                        src={service.image_url}
-                                        alt={service.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                        <Star className="h-16 w-16 text-white/50" />
-                                    </div>
-                                )}
-                                <div className="absolute top-4 right-4">
-                                    <Badge variant="secondary" className="bg-white/90 backdrop-blur">
-                                        {service.specialty}
-                                    </Badge>
-                                </div>
-                            </div>
-
-                            <CardHeader>
-                                <CardTitle className="text-xl">{service.name}</CardTitle>
-                                <CardDescription className="line-clamp-2">
-                                    {service.description}
-                                </CardDescription>
-                            </CardHeader>
-
-                            <CardContent className="space-y-4">
-                                {/* Service Details */}
-                                <div className="flex items-center justify-between text-sm">
-                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                        <Clock className="h-4 w-4" />
-                                        <span>{formatDuration(service.duration_minutes)}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 font-semibold text-primary">
-                                        <DollarSign className="h-4 w-4" />
-                                        <span>{formatPrice(service.price_min, service.price_max)}</span>
-                                    </div>
-                                </div>
-
-                                {/* Book Button */}
-                                <Button
-                                    className="w-full"
-                                    onClick={() => handleBookService(service)}
-                                >
-                                    <Calendar className="h-4 w-4 mr-2" />
-                                    Book This Service
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                {isLoading ? (
+                    <CardGridSkeleton count={6} />
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {services.map((service) => (
+                            <ServiceCard
+                                key={service.id}
+                                service={service}
+                                onBook={handleBookService}
+                            />
+                        ))}
+                    </div>
+                )}
 
                 {/* Service Booking Modal */}
                 {selectedService && selectedDentist && (

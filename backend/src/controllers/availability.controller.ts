@@ -16,7 +16,7 @@ export class AvailabilityController {
     // For now, return empty array (mock data)
     logger.info('Availability retrieved (mock)', {
       dentistId,
-      userId: req.user.id,
+      userId: req.user?.id,
     });
 
     res.json([]);
@@ -28,7 +28,7 @@ export class AvailabilityController {
    */
   update = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { dentistId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user?.id;
 
     // For now, return the slots as-is (mock data)
     logger.info('Availability updated (mock)', {
@@ -66,7 +66,7 @@ export class AvailabilityController {
       dentistId,
       date,
       slotsCount: slots.length,
-      userId: req.user.id,
+      userId: req.user?.id,
     });
 
     res.json({
@@ -82,7 +82,7 @@ export class AvailabilityController {
    * Reserve a time slot temporarily
    */
   reserveSlot = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user.id;
+    const userId = req.user?.id;
     const { dentist_id, slot_time } = req.body;
 
     if (!dentist_id || !slot_time) {
@@ -102,7 +102,7 @@ export class AvailabilityController {
     const reservation = await availabilityService.reserveSlot(
       dentist_id,
       slotDate,
-      userId
+      userId!
     );
 
     logger.info('Slot reserved', {
@@ -121,12 +121,12 @@ export class AvailabilityController {
    */
   releaseSlot = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user?.id;
 
     validationService.validateUUID(id, 'Reservation ID');
 
     // Release slot
-    await availabilityService.releaseSlot(id, userId);
+    await availabilityService.releaseSlot(id, userId!);
 
     logger.info('Slot reservation released', {
       reservationId: id,

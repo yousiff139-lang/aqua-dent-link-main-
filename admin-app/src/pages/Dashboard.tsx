@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { Card } from '@/components/ui/card'
 import { Users, Calendar, CheckCircle, Clock } from 'lucide-react'
-import { TodaysPatients } from '@/components/TodaysPatients'
 import api from '@/lib/api'
 
 interface DashboardStats {
@@ -22,8 +21,6 @@ export default function Dashboard() {
     pendingAppointments: 0,
     completedAppointments: 0,
   })
-  const [dentistName, setDentistName] = useState<string>('')
-  const [dentistId, setDentistId] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -39,7 +36,7 @@ export default function Dashboard() {
       // Use backend API to get dashboard stats
       try {
         const result = await api.get<{ success: boolean; data: DashboardStats }>('/admin/dashboard/stats')
-        
+
         if (result.success && result.data) {
           setStats({
             totalPatients: result.data.totalPatients || 0,
@@ -56,7 +53,7 @@ export default function Dashboard() {
           .select('patient_id')
 
         const uniquePatients = new Set(appointments?.map(a => a.patient_id).filter(Boolean) || [])
-        
+
         const today = new Date().toISOString().split('T')[0]
         const { count: todayCount } = await supabase
           .from('appointments')
@@ -81,9 +78,6 @@ export default function Dashboard() {
           completedAppointments: completedCount || 0,
         })
       }
-
-      // Set admin name
-      setDentistName(user.email || 'Admin')
     } catch (error) {
       console.error('Error loading dashboard:', error)
       // Set zeros on error
@@ -141,7 +135,7 @@ export default function Dashboard() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500 mt-1">Welcome back, {dentistName}</p>
+          <p className="text-gray-500 mt-1">Welcome back, {user?.email || 'Admin'}</p>
         </div>
 
         {/* Stats Grid */}
@@ -164,8 +158,7 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* Today's Patients */}
-        {dentistId && <TodaysPatients dentistId={dentistId} />}
+
 
         {/* Welcome Card */}
         <Card className="p-8 border-0 shadow-lg bg-gradient-to-r from-blue-50 to-cyan-50">

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from '@/components/Toaster'
 import {
   User, Building2, Bell, Brain, Palette, Shield,
-  Calendar, Clock, Phone, Download,
+  Phone, Download,
   Trash2, LogOut, Save, Check
 } from 'lucide-react'
 

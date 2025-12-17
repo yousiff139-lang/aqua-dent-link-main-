@@ -131,13 +131,13 @@ export const ChatbotWidget = () => {
           const fileName = `${sessionId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
 
           const { error: uploadError } = await supabase.storage
-            .from('medical_documents')
+            .from('medical-documents')
             .upload(fileName, file);
 
           if (uploadError) throw uploadError;
 
           const { data: { publicUrl } } = supabase.storage
-            .from('medical_documents')
+            .from('medical-documents')
             .getPublicUrl(fileName);
 
           return publicUrl;

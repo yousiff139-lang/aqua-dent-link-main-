@@ -40,5 +40,5 @@ export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction)
 export const generateToken = (payload: { id: number; email: string; type: string }): string => {
   return jwt.sign(payload, process.env.JWT_SECRET!, {
     expiresIn: process.env.JWT_EXPIRES_IN || '24h'
-  });
+  } as jwt.SignOptions);
 };

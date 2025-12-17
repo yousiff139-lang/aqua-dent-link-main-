@@ -13,6 +13,7 @@ const createDentistSchema = z.object({
   years_of_experience: z.number().int().nonnegative().optional(),
   bio: z.string().optional(),
   education: z.string().optional(),
+  image_url: z.string().optional(), // Base64 encoded image for profile picture
   availability: z.array(z.object({
     day_of_week: z.number().int().min(0).max(6),
     start_time: z.string().regex(/^\d{2}:\d{2}$/),
@@ -514,6 +515,7 @@ export class AdminService {
           years_of_experience: payload.years_of_experience || 0,
           bio: payload.bio || null,
           education: payload.education || null,
+          image_url: payload.image_url || null, // Include profile picture if provided
           status: 'active',
           updated_at: new Date().toISOString()
         }, {
@@ -759,6 +761,83 @@ export class AdminService {
       if (error instanceof AppError) throw error;
       logger.error('Unexpected error updating dentist', { error });
       throw AppError.internal('An unexpected error occurred while updating the dentist');
+    }
+  }
+
+  /**
+   * Upload dentist profile image
+   * Handles file upload to Supabase storage and updates dentist record
+   */
+  async uploadDentistImage(req: any): Promise<{ image_url: string }> {
+    try {
+      const dentistId = req.params.id;
+      const file = req.file;
+
+      if (!dentistId) {
+        throw AppError.validation('Dentist ID is required');
+      }
+
+      if (!file) {
+        throw AppError.validation('No image file provided');
+      }
+
+      // Validate dentist exists
+      const { data: existingDentist, error: checkError } = await supabase
+        .from('dentists')
+        .select('id')
+        .eq('id', dentistId)
+        .single();
+
+      if (checkError || !existingDentist) {
+        throw AppError.notFound(`Dentist with ID ${dentistId} not found`);
+      }
+
+      // Generate unique filename
+      const fileExtension = file.originalname.split('.').pop() || 'jpg';
+      const fileName = `dentist-${dentistId}-${Date.now()}.${fileExtension}`;
+      const filePath = `dentist-avatars/${fileName}`;
+
+      // Upload to Supabase storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: true
+        });
+
+      if (uploadError) {
+        logger.error('Failed to upload dentist image', { error: uploadError, dentistId });
+        throw AppError.internal('Failed to upload image');
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const imageUrl = urlData.publicUrl;
+
+      // Update dentist record with new image URL
+      const { error: updateError } = await supabase
+        .from('dentists')
+        .update({
+          image_url: imageUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', dentistId);
+
+      if (updateError) {
+        logger.error('Failed to update dentist with image URL', { error: updateError, dentistId });
+        throw AppError.internal('Failed to update dentist image');
+      }
+
+      logger.info('Dentist image uploaded successfully', { dentistId, imageUrl });
+
+      return { image_url: imageUrl };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      logger.error('Unexpected error uploading dentist image', { error });
+      throw AppError.internal('An unexpected error occurred while uploading the image');
     }
   }
 

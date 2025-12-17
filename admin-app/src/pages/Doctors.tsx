@@ -24,8 +24,8 @@ export default function Doctors() {
 
       // 1) Try backend API first
       try {
-      const response = await api.get<AdminDentistsResponse>('/admin/dentists')
-      const responseData = response as any
+        const response = await api.get<AdminDentistsResponse>('/admin/dentists')
+        const responseData = response as any
         const backendDoctors = responseData?.data
 
         if (Array.isArray(backendDoctors) && backendDoctors.length > 0) {
@@ -88,7 +88,7 @@ export default function Doctors() {
       fetchDoctors()
       // Clear the state to prevent unnecessary refreshes
       navigate(location.pathname, { replace: true, state: {} })
-      
+
       // Show success message if new dentist was created
       if (location.state?.newDentist) {
         toast({
@@ -168,8 +168,8 @@ export default function Doctors() {
           <Card className="p-12 border-0 shadow-lg text-center">
             <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500">No doctors found</p>
-            <Button 
-              onClick={() => navigate('/add-doctor')} 
+            <Button
+              onClick={() => navigate('/add-doctor')}
               className="mt-4"
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -179,8 +179,8 @@ export default function Doctors() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredDoctors.map((doctor) => (
-              <Card 
-                key={doctor.id} 
+              <Card
+                key={doctor.id}
                 className="p-6 border-0 shadow-lg hover:shadow-xl transition-all relative group"
               >
                 {doctor.status === 'inactive' && (
@@ -188,7 +188,7 @@ export default function Doctors() {
                     Inactive
                   </div>
                 )}
-                
+
                 <button
                   onClick={() => navigate(`/edit-profile/${doctor.id}`)}
                   className="absolute top-4 right-4 w-8 h-8 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -196,7 +196,7 @@ export default function Doctors() {
                 >
                   <Edit className="w-4 h-4 text-blue-600" />
                 </button>
-                
+
                 <div className="flex items-start gap-4">
                   <img
                     src={doctor.profile_picture || doctor.image_url || '/avatars/default.png.svg'}
@@ -211,9 +211,9 @@ export default function Doctors() {
                     <h3 className="font-semibold text-gray-900 truncate text-lg">{doctor.name}</h3>
                     <p className="text-sm text-gray-500 truncate">{doctor.email}</p>
                     <p className="text-sm text-blue-600 mt-1 font-medium">
-                      {doctor.specialization || doctor.specialty || 'General Dentistry'}
+                      {doctor.specialization || (doctor as any).specialty || 'General Dentistry'}
                     </p>
-                    
+
                     <div className="mt-3 flex items-center gap-4 text-sm">
                       <div className="flex items-center gap-1 text-gray-600">
                         <CalendarCheck className="w-4 h-4 text-emerald-500" />
@@ -230,9 +230,9 @@ export default function Doctors() {
                     )}
 
                     <div className="mt-4 flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         className="flex-1"
                         onClick={() => navigate(`/edit-profile/${doctor.id}`)}
                       >

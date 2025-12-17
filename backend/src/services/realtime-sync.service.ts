@@ -147,7 +147,7 @@ export class RealtimeSyncService {
         id: `${channelName}-${Date.now()}`,
         channelName,
         active: true,
-        unsubscribe: () => this.unsubscribe({ id: `${channelName}-${Date.now()}`, unsubscribe: () => {} }),
+        unsubscribe: () => this.unsubscribe({ id: `${channelName}-${Date.now()}`, unsubscribe: () => { } }),
       };
 
       this.subscriptions.set(subscription.id, subscription);
@@ -228,7 +228,7 @@ export class RealtimeSyncService {
         id: `${channelName}-${Date.now()}`,
         channelName,
         active: true,
-        unsubscribe: () => this.unsubscribe({ id: `${channelName}-${Date.now()}`, unsubscribe: () => {} }),
+        unsubscribe: () => this.unsubscribe({ id: `${channelName}-${Date.now()}`, unsubscribe: () => { } }),
       };
 
       this.subscriptions.set(subscription.id, subscription);
@@ -303,7 +303,7 @@ export class RealtimeSyncService {
         id: `${channelName}-${Date.now()}`,
         channelName,
         active: true,
-        unsubscribe: () => this.unsubscribe({ id: `${channelName}-${Date.now()}`, unsubscribe: () => {} }),
+        unsubscribe: () => this.unsubscribe({ id: `${channelName}-${Date.now()}`, unsubscribe: () => { } }),
       };
 
       this.subscriptions.set(subscription.id, subscription);
@@ -338,7 +338,7 @@ export class RealtimeSyncService {
 
             logger.info('Real-time: Admin appointment change', {
               eventType,
-              appointmentId: payload.new?.id || payload.old?.id,
+              appointmentId: (payload.new as any)?.id || (payload.old as any)?.id,
             });
 
             if (eventType === 'INSERT' && callbacks.onAppointmentCreated && payload.new) {
@@ -346,7 +346,7 @@ export class RealtimeSyncService {
             } else if (eventType === 'UPDATE' && callbacks.onAppointmentUpdated && payload.new) {
               callbacks.onAppointmentUpdated(payload.new as Appointment);
             } else if (eventType === 'DELETE' && callbacks.onAppointmentDeleted && payload.old) {
-              callbacks.onAppointmentDeleted(payload.old.id);
+              callbacks.onAppointmentDeleted((payload.old as any).id);
             }
           }
         )
@@ -371,7 +371,7 @@ export class RealtimeSyncService {
         id: `${channelName}-${Date.now()}`,
         channelName,
         active: true,
-        unsubscribe: () => this.unsubscribe({ id: `${channelName}-${Date.now()}`, unsubscribe: () => {} }),
+        unsubscribe: () => this.unsubscribe({ id: `${channelName}-${Date.now()}`, unsubscribe: () => { } }),
       };
 
       this.subscriptions.set(subscription.id, subscription);

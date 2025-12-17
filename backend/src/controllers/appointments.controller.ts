@@ -85,7 +85,7 @@ export class AppointmentsController {
    */
   getByDentistEmail = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { dentistEmail } = req.params;
-    const userId = req.user.id;
+    const userId = req.user?.id;
 
     // Validate email format
     if (!dentistEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dentistEmail)) {
@@ -93,19 +93,20 @@ export class AppointmentsController {
     }
 
     // Validate query parameters
-    const filters = validationService.validateAppointmentFilters(req.query);
+    const validatedFilters = validationService.validateAppointmentFilters(req.query);
 
     // Convert string dates to Date objects if provided
-    if (filters.date_from) {
-      filters.date_from = new Date(filters.date_from);
+    const filters: any = { ...validatedFilters };
+    if (validatedFilters.date_from) {
+      filters.date_from = new Date(validatedFilters.date_from);
     }
-    if (filters.date_to) {
-      filters.date_to = new Date(filters.date_to);
+    if (validatedFilters.date_to) {
+      filters.date_to = new Date(validatedFilters.date_to);
     }
 
     // Authorization: Only the dentist themselves can access their appointments
     // Check if the authenticated user's email matches the dentist email
-    if (req.user.email !== dentistEmail && req.user.role !== 'admin') {
+    if (req.user?.email !== dentistEmail && req.user?.role !== 'admin') {
       throw AppError.forbidden('Not authorized to access these appointments');
     }
 
@@ -133,7 +134,7 @@ export class AppointmentsController {
    */
   getByPatientEmail = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { email } = req.params;
-    const userId = req.user.id;
+    const userId = req.user?.id;
 
     // Validate email format
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -141,18 +142,19 @@ export class AppointmentsController {
     }
 
     // Validate query parameters
-    const filters = validationService.validateAppointmentFilters(req.query);
+    const validatedFilters = validationService.validateAppointmentFilters(req.query);
 
     // Convert string dates to Date objects if provided
-    if (filters.date_from) {
-      filters.date_from = new Date(filters.date_from);
+    const filters: any = { ...validatedFilters };
+    if (validatedFilters.date_from) {
+      filters.date_from = new Date(validatedFilters.date_from);
     }
-    if (filters.date_to) {
-      filters.date_to = new Date(filters.date_to);
+    if (validatedFilters.date_to) {
+      filters.date_to = new Date(validatedFilters.date_to);
     }
 
     // Authorization: Only the patient themselves can access their appointments
-    if (req.user.email !== email && req.user.role !== 'admin') {
+    if (req.user?.email !== email && req.user?.role !== 'admin') {
       throw AppError.forbidden('Not authorized to access these appointments');
     }
 
@@ -181,7 +183,7 @@ export class AppointmentsController {
    */
   getById = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user?.id;
 
     validationService.validateUUID(id, 'Appointment ID');
 
@@ -204,7 +206,7 @@ export class AppointmentsController {
    */
   update = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user?.id;
 
     validationService.validateUUID(id, 'Appointment ID');
 
@@ -214,8 +216,8 @@ export class AppointmentsController {
     try {
       // If marking as completed, use the dedicated method
       if (validatedData.status === 'completed') {
-        const appointment = await appointmentsService.markAppointmentComplete(id, userId);
-        
+        const appointment = await appointmentsService.markAppointmentComplete(id, userId!);
+
         logger.info('Appointment marked as completed', {
           appointmentId: id,
           userId,
@@ -232,7 +234,7 @@ export class AppointmentsController {
       const appointment = await appointmentsService.updateAppointment(
         id,
         validatedData,
-        userId
+        userId!
       );
 
       logger.info('Appointment updated', {
@@ -247,12 +249,12 @@ export class AppointmentsController {
       });
     } catch (error) {
       // If slot is unavailable during reschedule, get alternative slots
-      if (error instanceof AppError && error.code === 'SLOT_UNAVAILABLE' && 
-          (validatedData.appointment_date || validatedData.appointment_time)) {
-        
+      if (error instanceof AppError && error.code === 'SLOT_UNAVAILABLE' &&
+        (validatedData.appointment_date || validatedData.appointment_time)) {
+
         // Get the appointment to find dentist email
         const appointment = await appointmentsService.getAppointmentById(id, userId);
-        
+
         const alternativeSlots = await appointmentsService.getAlternativeSlots(
           appointment.dentist_email,
           validatedData.appointment_date || appointment.appointment_date.toString().split('T')[0],
@@ -296,12 +298,12 @@ export class AppointmentsController {
    */
   cancel = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user?.id;
 
     validationService.validateUUID(id, 'Appointment ID');
 
     // Cancel appointment
-    const cancelledAppointment = await appointmentsService.cancelAppointment(id, userId);
+    const cancelledAppointment = await appointmentsService.cancelAppointment(id, userId!);
 
     logger.info('Appointment cancelled', {
       appointmentId: id,

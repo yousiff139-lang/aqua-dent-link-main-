@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Home, Users, Calendar, User, UserPlus, Settings, LogOut, Code } from 'lucide-react'
+import { Home, Users, Calendar, UserPlus, Settings, LogOut, Code } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { isAdminEmail } from '@/lib/auth'
 
@@ -38,8 +38,8 @@ export function Sidebar() {
               key={item.path}
               to={item.path}
               className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200 group relative ${active
-                  ? 'bg-gradient-to-br from-blue-500 to-cyan-400 shadow-lg shadow-blue-200'
-                  : 'bg-white hover:bg-blue-50 border border-blue-100'
+                ? 'bg-gradient-to-br from-blue-500 to-cyan-400 shadow-lg shadow-blue-200'
+                : 'bg-white hover:bg-blue-50 border border-blue-100'
                 }`}
               title={item.label}
             >

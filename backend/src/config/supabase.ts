@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { env } from './env.js';
 import { logger } from './logger.js';
+import fetch from 'node-fetch';
 
 // Validate Supabase credentials
 if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -26,6 +27,7 @@ export const supabase = createClient(
       schema: 'public',
     },
     global: {
+      fetch: fetch as unknown as typeof globalThis.fetch,
       headers: {
         'x-application-name': 'realtime-sync-backend',
         'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
@@ -45,7 +47,7 @@ export const testSupabaseConnection = async (): Promise<boolean> => {
     logger.info('✅ Supabase connection successful');
     return true;
   } catch (error: any) {
-    logger.error('Supabase connection test error', { 
+    logger.error('Supabase connection test error', {
       error: error.message,
       stack: error.stack,
     });
@@ -56,7 +58,7 @@ export const testSupabaseConnection = async (): Promise<boolean> => {
 // Validate service role key format
 export const validateServiceRoleKey = (): { valid: boolean; message?: string } => {
   const key = env.SUPABASE_SERVICE_ROLE_KEY;
-  
+
   // Check if key starts with 'sb_' (publishable key format)
   if (key.startsWith('sb_')) {
     return {
@@ -64,7 +66,7 @@ export const validateServiceRoleKey = (): { valid: boolean; message?: string } =
       message: 'Service role key appears to be a publishable key (starts with "sb_"). Please use the service_role key from Supabase Dashboard > Settings > API.'
     };
   }
-  
+
   // Check if key starts with 'eyJ' (JWT format - correct for service role)
   if (!key.startsWith('eyJ')) {
     return {
@@ -72,7 +74,7 @@ export const validateServiceRoleKey = (): { valid: boolean; message?: string } =
       message: 'Service role key format is unexpected. Service role keys should start with "eyJ" (JWT format).'
     };
   }
-  
+
   return { valid: true };
 };
 
@@ -82,17 +84,17 @@ export const testAdminPermissions = async (): Promise<boolean> => {
     // Try to list users (requires admin permissions)
     const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1 });
     if (error) {
-      logger.error('Service role key does not have admin permissions', { 
+      logger.error('Service role key does not have admin permissions', {
         error: error.message,
         code: error.code,
-        status: error.status 
+        status: error.status
       });
       return false;
     }
     logger.info('✅ Service role key has admin permissions');
     return true;
   } catch (error: any) {
-    logger.error('Admin permissions test error', { 
+    logger.error('Admin permissions test error', {
       error: error.message,
       stack: error.stack,
     });
@@ -105,14 +107,14 @@ export const testCreateUserCapability = async (): Promise<{ success: boolean; er
   try {
     const testEmail = `test-${Date.now()}@example.com`;
     const testPassword = 'Test123456!';
-    
+
     // Attempt to create a test user
     const { data, error } = await supabase.auth.admin.createUser({
       email: testEmail,
       password: testPassword,
       email_confirm: true,
     });
-    
+
     if (error) {
       logger.error('Service role key cannot create users', {
         error: error.message,
@@ -124,7 +126,7 @@ export const testCreateUserCapability = async (): Promise<{ success: boolean; er
         error: `Cannot create users: ${error.message || error.code || 'Unknown error'}`
       };
     }
-    
+
     // If user was created, delete it immediately
     if (data?.user?.id) {
       try {
@@ -134,7 +136,7 @@ export const testCreateUserCapability = async (): Promise<{ success: boolean; er
         logger.warn('Test user created but could not be deleted', { userId: data.user.id, error: deleteError });
       }
     }
-    
+
     return { success: true };
   } catch (error: any) {
     logger.error('Create user capability test error', {
@@ -156,6 +158,9 @@ export const supabaseAuth = createClient(
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+    },
+    global: {
+      fetch: fetch as unknown as typeof globalThis.fetch,
     },
   }
 );

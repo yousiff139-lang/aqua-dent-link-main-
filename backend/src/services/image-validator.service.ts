@@ -17,7 +17,7 @@ export class ImageValidatorService {
      * Check if file extension indicates it's an X-ray format
      */
     isXrayFileExtension(filename: string): boolean {
-        const xrayExtensions = ['.dcm', '.dicom', '.png', '.jpg', '.jpeg'];
+        const xrayExtensions = ['.dcm', '.dicom', '.png', '.jpg', '.jpeg', '.webp', '.gif'];
         const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
         return xrayExtensions.includes(extension);
     }
@@ -25,7 +25,7 @@ export class ImageValidatorService {
     /**
      * Get X-ray format from filename
      */
-    getXrayFormat(filename: string): 'DCM' | 'PNG' | 'JPEG' | null {
+    getXrayFormat(filename: string): 'DCM' | 'PNG' | 'JPEG' | 'WEBP' | null {
         const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
 
         if (extension === '.dcm' || extension === '.dicom') {
@@ -34,6 +34,8 @@ export class ImageValidatorService {
             return 'PNG';
         } else if (extension === '.jpg' || extension === '.jpeg') {
             return 'JPEG';
+        } else if (extension === '.webp' || extension === '.gif') {
+            return 'WEBP';
         }
 
         return null;
@@ -143,8 +145,8 @@ export class ImageValidatorService {
      * X-rays are typically between 100KB and 10MB
      */
     isValidXraySize(fileSize: number): boolean {
-        const minSize = 100 * 1024; // 100KB
-        const maxSize = 10 * 1024 * 1024; // 10MB
+        const minSize = 10 * 1024; // 10KB (lowered from 100KB to allow smaller images)
+        const maxSize = 50 * 1024 * 1024; // 50MB (increased for larger DICOM files)
         return fileSize >= minSize && fileSize <= maxSize;
     }
 
