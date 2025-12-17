@@ -226,13 +226,13 @@ export const AppointmentCard = ({
           )}
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2 pt-2 border-t">
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
             {showCompleteButton && (
               <Button
                 size="sm"
                 onClick={() => onMarkComplete(appointment)}
                 disabled={!canClickComplete || isProcessing}
-                className={`flex-1 transition-all ${canClickComplete
+                className={`transition-all ${canClickComplete
                   ? 'bg-green-600 hover:bg-green-700 text-white hover:scale-105'
                   : 'opacity-50 cursor-not-allowed'
                   }`}
@@ -248,7 +248,7 @@ export const AppointmentCard = ({
                 variant="outline"
                 onClick={() => onReschedule(appointment)}
                 disabled={isProcessing}
-                className="flex-1 transition-all hover:scale-105"
+                className="transition-all hover:scale-105"
               >
                 <CalendarClock className="h-4 w-4 mr-2" />
                 Reschedule
@@ -260,21 +260,25 @@ export const AppointmentCard = ({
                 variant="outline"
                 onClick={() => onCancel(appointment)}
                 disabled={isProcessing}
-                className="flex-1 transition-all hover:scale-105 text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="transition-all hover:scale-105 text-red-600 hover:text-red-700 hover:bg-red-50"
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancel
               </Button>
             )}
-            {/* Always show PDF download button */}
+            {/* PDF Report Button - Always visible */}
             <Button
               size="sm"
               variant="outline"
               onClick={async () => {
-                // Generate and download PDF with appointment details
-                const apt = appointment as any; // Cast to access all fields
+                // If there's an existing PDF report URL, open it
+                if (appointment.pdf_report_url) {
+                  window.open(appointment.pdf_report_url, '_blank');
+                  return;
+                }
 
-                // Fetch health info and documents from database
+                // Otherwise, generate a PDF using jsPDF (same format as chatbot)
+                const apt = appointment as any;
                 try {
                   const { createClient } = await import('@supabase/supabase-js');
                   const supabase = createClient(
@@ -282,197 +286,72 @@ export const AppointmentCard = ({
                     import.meta.env.VITE_SUPABASE_ANON_KEY
                   );
 
-                  // Fetch health information and documents from appointment_medical_info
+                  // Fetch medical info
                   const { data: medicalInfo } = await supabase
                     .from('appointment_medical_info')
                     .select('*')
                     .eq('appointment_id', apt.id)
                     .single();
 
-                  // Use medical info as health info and extract documents
+                  // Fetch uploaded documents from appointment_documents (chatbot bookings)
+                  const { data: chatbotDocs } = await supabase
+                    .from('appointment_documents')
+                    .select('*')
+                    .eq('appointment_id', apt.id);
+
+                  // Also fetch from medical_documents (manual bookings via EnhancedBookingForm)
+                  const { data: manualDocs } = await supabase
+                    .from('medical_documents')
+                    .select('*')
+                    .eq('appointment_id', apt.id);
+
                   const healthInfo = medicalInfo;
-                  const documents = medicalInfo?.documents || [];
 
-                  // Create a printable window
-                  const printWindow = window.open('', '_blank');
-                  if (printWindow) {
-                    printWindow.document.write(`
-                      <html>
-                        <head>
-                          <title>Appointment - ${apt.patient_name}</title>
-                          <style>
-                            body { font-family: Arial, sans-serif; padding: 40px; line-height: 1.6; max-width: 800px; margin: 0 auto; }
-                            h1 { color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; }
-                            h2 { color: #374151; margin-top: 30px; margin-bottom: 15px; font-size: 18px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
-                            .section { margin: 20px 0; padding: 15px; background: #f9fafb; border-radius: 8px; }
-                            .label { font-weight: bold; color: #374151; }
-                            .value { margin-left: 10px; color: #1f2937; }
-                            .empty { font-style: italic; color: #9ca3af; }
-                            .doc-link { color: #2563eb; text-decoration: none; display: block; margin: 5px 0; }
-                            .doc-link:hover { text-decoration: underline; }
-                            @media print { button { display: none; } }
-                          </style>
-                        </head>
-                        <body>
-                          <h1>Appointment Summary</h1>
-                          
-                          <div class="section">
-                            <h2>Patient Information</h2>
-                            <p><span class="label">Name:</span><span class="value">${apt.patient_name}</span></p>
-                            <p><span class="label">Email:</span><span class="value">${apt.patient_email}</span></p>
-                            <p><span class="label">Phone:</span><span class="value">${apt.patient_phone || 'N/A'}</span></p>
-                          </div>
-                          
-                          <div class="section">
-                            <h2>Appointment Details</h2>
-                            <p><span class="label">Date:</span><span class="value">${formatDate(apt.appointment_date)}</span></p>
-                            <p><span class="label">Time:</span><span class="value">${formatTime(apt.appointment_time)}</span></p>
-                            <p><span class="label">Status:</span><span class="value">${apt.status}</span></p>
-                          </div>
-                          
-                          <div class="section">
-                            <h2>Symptoms / Chief Complaint</h2>
-                            <p><span class="value">${apt.reason || apt.symptoms || 'Not specified'}</span></p>
-                          </div>
-                          
-                          <div class="section">
-                            <h2>Medical Information</h2>
-                            <p><span class="label">Patient Name:</span><span class="value">${apt.patient_name}</span></p>
-                            ${(() => {
-                        // Try to get from healthInfo table first
-                        if (healthInfo) {
-                          let output = '';
-                          if (healthInfo.gender) {
-                            output += `<p><span class="label">Gender:</span><span class="value">${healthInfo.gender.charAt(0).toUpperCase() + healthInfo.gender.slice(1)}</span></p>`;
-                          }
-                          if (healthInfo.is_pregnant !== null && healthInfo.is_pregnant !== undefined) {
-                            output += `<p><span class="label">Pregnancy Status:</span><span class="value">${healthInfo.is_pregnant ? 'Pregnant' : 'Not Pregnant'}</span></p>`;
-                          }
-                          if (healthInfo.chronic_diseases) {
-                            output += `<p><span class="label">Chronic Diseases:</span><br/><span class="value">${healthInfo.chronic_diseases}</span></p>`;
-                          }
-                          return output || '<p class="empty">No additional medical information</p>';
-                        }
+                  // Combine documents from both sources
+                  const allDocs = [
+                    ...(chatbotDocs || []).map((d: any) => ({
+                      file_url: d.file_url,
+                      file_name: d.file_name || d.file_url?.split('/').pop()
+                    })),
+                    ...(manualDocs || []).map((d: any) => ({
+                      file_url: d.file_url,
+                      file_name: d.file_name || d.file_url?.split('/').pop()
+                    }))
+                  ];
+                  const docs = allDocs;
 
-                        // Fallback: Parse from medical_history field
-                        const medHistory = apt.medical_history || '';
-                        let output = '';
+                  // Use the PDF generator
+                  const { previewAppointmentPDF } = await import('@/services/pdfGenerator');
 
-                        // Extract gender
-                        const genderMatch = medHistory.match(/Gender:\s*(\w+)/i);
-                        if (genderMatch) {
-                          const gender = genderMatch[1];
-                          output += `<p><span class="label">Gender:</span><span class="value">${gender.charAt(0).toUpperCase() + gender.slice(1)}</span></p>`;
-                        }
-
-                        // Extract pregnancy
-                        const pregnantMatch = medHistory.match(/Pregnant:\s*(Yes|No)/i);
-                        if (pregnantMatch) {
-                          output += `<p><span class="label">Pregnancy Status:</span><span class="value">${pregnantMatch[1]}</span></p>`;
-                        }
-
-                        // Extract chronic diseases
-                        const chronicMatch = medHistory.match(/Chronic Diseases:\s*([^|\n]+)/i);
-                        if (chronicMatch) {
-                          output += `<p><span class="label">Chronic Diseases:</span><br/><span class="value">${chronicMatch[1].trim()}</span></p>`;
-                        }
-
-                        return output || '<p class="empty">No additional medical information</p>';
-                      })()}
-                          </div>
-                          
-                          <div class="section">
-                            <h2>Medical History</h2>
-                            ${(() => {
-                        // Try healthInfo first
-                        if (healthInfo?.medical_history) {
-                          return `<p><span class="value">${healthInfo.medical_history}</span></p>`;
-                        }
-
-                        // Parse medical_history to extract actual history (not gender/pregnancy)
-                        const medHistory = apt.medical_history || '';
-
-                        // Remove the structured data (Gender, Pregnant, Chronic Diseases)
-                        let cleanHistory = medHistory
-                          .replace(/Gender:\s*\w+\s*\|?/gi, '')
-                          .replace(/Pregnant:\s*(Yes|No)\s*\|?/gi, '')
-                          .replace(/Chronic Diseases:\s*[^|\n]+\s*\|?/gi, '')
-                          .replace(/Medical History:\s*/gi, '')
-                          .trim();
-
-                        // Remove leading/trailing pipes
-                        cleanHistory = cleanHistory.replace(/^\|\s*|\s*\|$/g, '').trim();
-
-                        if (cleanHistory) {
-                          return `<p><span class="value">${cleanHistory}</span></p>`;
-                        }
-
-                        // Check if there are documents
-                        if (documents && documents.length > 0) {
-                          return '<p class="empty">Patient uploaded documentation (see below)</p>';
-                        }
-
-                        return '<p class="empty">Nothing was provided</p>';
-                      })()}
-                          </div>
-                          
-                          ${documents && documents.length > 0 ? `
-                            <div class="section">
-                              <h2>Uploaded Documents</h2>
-                              <p><span class="label">${documents.length} document(s) uploaded:</span></p>
-                              ${documents.map((doc: any, index: number) => `
-                                <a href="${doc.file_url}" target="_blank" class="doc-link">
-                                  ${index + 1}. ${doc.file_name} (${doc.file_type.toUpperCase()})
-                                </a>
-                              `).join('')}
-                            </div>
-                          ` : ''}
-                          
-                          <div class="section">
-                            <h2>Payment</h2>
-                            <p><span class="label">Method:</span><span class="value">${apt.payment_method}</span></p>
-                            <p><span class="label">Status:</span><span class="value">${apt.payment_status}</span></p>
-                          </div>
-                          
-                          <div class="section">
-                            <h2>Dentist Notes</h2>
-                            <p>${apt.notes || '<span class="empty">No notes yet</span>'}</p>
-                          </div>
-                          
-                          <button onclick="window.print()" style="margin-top: 20px; padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 5px; cursor: pointer;">Print/Save as PDF</button>
-                        </body>
-                      </html>
-                    `);
-                    printWindow.document.close();
-                  }
+                  previewAppointmentPDF({
+                    patientName: apt.patient_name,
+                    patientEmail: apt.patient_email,
+                    patientPhone: apt.patient_phone,
+                    dentistName: apt.dentist_name,
+                    symptoms: apt.reason || apt.symptoms,
+                    appointmentDate: apt.appointment_date,
+                    appointmentTime: apt.appointment_time,
+                    paymentMethod: apt.payment_method,
+                    paymentStatus: apt.payment_status,
+                    bookingReference: apt.booking_reference || apt.id?.slice(0, 8).toUpperCase(),
+                    notes: apt.notes,
+                    gender: healthInfo?.gender,
+                    isPregnant: healthInfo?.is_pregnant,
+                    chronicDiseases: healthInfo?.chronic_diseases,
+                    medicalHistory: healthInfo?.medical_history,
+                    documentUrls: docs.map((d: any) => d.file_url),
+                    documentNames: docs.map((d: any) => d.file_name),
+                  });
                 } catch (error) {
                   console.error('Error generating PDF:', error);
-                  alert('Failed to generate PDF. Please try again.');
                 }
               }}
-              className="flex-1 transition-all hover:scale-105"
-              title="Download appointment details as PDF"
+              className="transition-all hover:scale-105 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300"
+              title="View PDF Report"
             >
               <Download className="h-4 w-4 mr-2" />
-              Download PDF
+              PDF Report
             </Button>
-            {appointment.pdf_report_url && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => window.open(appointment.pdf_report_url, '_blank')}
-                className="flex-1 transition-all hover:scale-105"
-                title="Download PDF Report"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                PDF Report
-              </Button>
-            )}
-            {!showCompleteButton && !canReschedule && !appointment.pdf_report_url && (
-              <div className="flex-1 text-center text-sm text-muted-foreground py-2">
-                No actions available
-              </div>
-            )}
           </div>
         </div>
       </CardContent>

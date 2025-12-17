@@ -26,8 +26,24 @@ AI-powered dental practice management platform with patient booking, dentist por
 - 🔍 **AI X-Ray Analysis** - Detects cavities and periapical lesions using Roboflow AI
 - 📝 **Diagnostic Reports** - AI-generated reports with treatment recommendations
 - 💬 **Smart Chatbot** - Answers dental questions using Google Gemini
-- 📄 **PDF Export** - Download appointment summaries and diagnostic reports
+- 📄 **PDF Reports** - Unified PDF generation for all bookings (chatbot & manual)
+- 📎 **Document Upload** - Upload X-rays and medical documents during booking
 - 🎨 **Modern UI** - Beautiful glassmorphism design with smooth animations
+
+### 📄 PDF Report System
+
+The platform features a unified PDF report system that generates consistent appointment summaries:
+
+- **Patient Information** - Name, Email, Phone number
+- **Appointment Details** - Dentist, Date, Time
+- **Medical Information** - Gender, Pregnancy status, Chronic diseases
+- **Uploaded Documents** - Clickable links to X-rays and medical files
+- **Payment Information** - Payment method and status
+
+PDFs are generated using **jsPDF** and can be:
+- Automatically generated after chatbot booking
+- Downloaded on-demand from the dentist portal
+- Stored in Supabase Storage for future access
 
 ---
 

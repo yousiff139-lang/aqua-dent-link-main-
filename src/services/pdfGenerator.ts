@@ -7,6 +7,8 @@ import jsPDF from 'jspdf';
 
 export interface AppointmentSummaryData {
   patientName: string;
+  patientEmail?: string;
+  patientPhone?: string;
   dentistName: string;
   symptoms: string;
   appointmentTime: string;
@@ -83,6 +85,16 @@ export function generateAppointmentPDF(data: AppointmentSummaryData): Uint8Array
   doc.setFont('helvetica', 'normal');
   doc.text(`Name: ${data.patientName}`, margin + 5, yPosition);
   yPosition += lineHeight;
+
+  if (data.patientEmail) {
+    doc.text(`Email: ${data.patientEmail}`, margin + 5, yPosition);
+    yPosition += lineHeight;
+  }
+
+  if (data.patientPhone) {
+    doc.text(`Phone: ${data.patientPhone}`, margin + 5, yPosition);
+    yPosition += lineHeight;
+  }
 
   // Appointment Details Section
   checkNewPage();

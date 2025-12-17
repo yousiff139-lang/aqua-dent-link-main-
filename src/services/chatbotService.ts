@@ -1779,6 +1779,8 @@ export class ChatbotService {
     try {
       const pdfData = {
         patientName: context.patientName || 'Unknown',
+        patientEmail: context.patientEmail || '',
+        patientPhone: context.patientPhone || '',
         dentistName: dentist.name,
         symptoms: context.symptom || 'Not specified',
         appointmentTime: context.selectedTime || '',

@@ -1,6 +1,5 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
@@ -32,18 +31,6 @@ const XRayLab = lazy(() => import('@/pages/XRayLab'));
 const Developers = lazy(() => import('@/pages/Developers'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
-// Optimized QueryClient with aggressive caching
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-      staleTime: 10 * 60 * 1000, // 10 minutes - data stays fresh longer
-      gcTime: 30 * 60 * 1000, // 30 minutes cache time
-    },
-  },
-});
-
 function AppContent() {
   useNetworkStatus();
 
@@ -72,14 +59,12 @@ function AppContent() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <AppContent />
-          <Toaster position="top-right" richColors />
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppContent />
+        <Toaster position="top-right" richColors />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
